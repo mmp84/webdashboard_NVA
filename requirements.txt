@@ -1,0 +1,10 @@
+streamlit
+streamlit_folium
+streamlit_autorefresh
+folium
+geopandas
+pandas
+shapely
+numpy
+branca
+plotly
