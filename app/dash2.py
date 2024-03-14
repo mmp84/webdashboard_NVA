@@ -15,13 +15,12 @@ from streamlit_autorefresh import st_autorefresh
 
 st.set_page_config(layout="wide")
 st_autorefresh(interval=60 * 60 * 1000, key="dataframerefresh")
-sqlite_db_path = 'ftp/data/database.sqlite'
+sqlite_db_path = '../ftp/data/database.sqlite'
 file_path = '/assets'
 #initiate selected_sites, show_labels and show_sites and colormap
 selected_sites = []
 show_labels = False
 show_sites = False
-
 
 with open('app/style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
@@ -82,7 +81,7 @@ def get_image_as_base64(path):
         return base64.b64encode(img_file.read()).decode()
 
 # Path to your local logo image file
-local_logo_path = "D:\Learning\Python Codes\Web Dashboard\mobily.png"
+local_logo_path = 'app/assets/mobily.png'
 # Convert the image to base64
 logo_base64 = get_image_as_base64(local_logo_path)
 # Display the logo using HTML with base64
@@ -90,7 +89,6 @@ logo_base64 = get_image_as_base64(local_logo_path)
 st.sidebar.write("")    
 st.sidebar.write("")
 st.sidebar.write("")    
-st.sidebar.write("")
 st.sidebar.markdown(f'<img src="data:image/png;base64,{logo_base64}" alt="Logo" style="height: 70px; width: 100px;">', unsafe_allow_html=True)
 #tempdf = pd.read_excel(excel_file_path)
 
@@ -129,7 +127,7 @@ def load_and_process_data():
 
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def create_kpis(df4G, df3G, df2G, df5G):
 
     df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
@@ -199,7 +197,7 @@ def create_kpis(df4G, df3G, df2G, df5G):
 
     return mergeddf
 # @st.cache_data
-def create_map(filtered_gdf, selected_kpi, show_labels,colormap):
+def create_map(filtered_gdf, selected_kpi, show_labels,colormap, show_sites):
     try:
     # Create a folium map
         m = folium.Map(location=[filtered_gdf['lat'].mean(), filtered_gdf['long'].mean()], zoom_start=15)
@@ -223,7 +221,7 @@ def create_map(filtered_gdf, selected_kpi, show_labels,colormap):
             if show_sites:    
                 folium.CircleMarker(
                     location=[row['lat'], row['long']],
-                    radius=7,
+                    radius=2.5,
                     color= marker_color,
                     fill=True,
                     fill_color= marker_color,
@@ -287,7 +285,7 @@ def create_gauge_chart(value, max_value, title, reference):
     ))
 
     # Adjust layout to fit in a single row
-    fig.update_layout(autosize=True, height=160, margin={'t': 40, 'b': 10, 'l': 10, 'r': 0})
+    fig.update_layout(autosize=True, height=160, margin={'t': 20, 'b': 10, 'l': 10, 'r': 10})
     return fig
 
 
@@ -303,6 +301,9 @@ def get_time_options_for_date(date,gdf):
 
 
 def main():
+    #timeit
+    start_time = time.time()
+
     dataframes = load_and_process_data()
     # Accessing the individual dataframes
     df2G = dataframes['2G']
@@ -312,7 +313,7 @@ def main():
     sitedf = load_site_data()
     mergeddf = create_kpis(df4G, df3G, df2G, df5G)
     # print(mergeddf.head())
-    #null count in mergeddf
+    # # null count in mergeddf
     # print(mergeddf.isna().sum())
 
     # export mergeddf to csv
@@ -322,6 +323,8 @@ def main():
     # st.write("wedges done")
 
     Sites_KPIs_df = pd.merge(site_df, mergeddf, on = 'Sector')
+    # copy Sites_KPIs_df to gdf (new dataframe)
+    # gdf = Sites_KPIs_df.copy()
     gdf = gpd.GeoDataFrame(Sites_KPIs_df, geometry= 'geometry')
     KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']  # Replace with actual KPI column names
 
@@ -342,6 +345,7 @@ def main():
         st.markdown("<h1 style='text-align: center; background-color: #ADD8E6;'>Network Visual Analytics</h1>", unsafe_allow_html=True)
         st.write("")
         st.write("")
+        st.write("")     
         
     with st.sidebar.expander("Select Data", expanded= True):
         st.write("")         
@@ -384,27 +388,25 @@ def main():
                     '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']
 
     filtered_gdf[numeric_cols] = filtered_gdf[numeric_cols].round(2)
-    #-----------------------------------------Guage Charts------------------------------------------------
+    # -----------------------------------------Guage Charts------------------------------------------------
     dash_2 = st.container()
     with dash_2:
         col5, col6 =  st.columns(2)
-        value = filtered_gdf['5G_H_Total Traffic (GB)'].sum()/filtered_gdf['Total PS Traffic GB'].sum()*100
-        gauge_chart = create_gauge_chart(value, 100, "5G Traffic Penetration", 20)
-        st.write("")
-        st.write("")
+        Penetration_5G = filtered_gdf['5G_H_Total Traffic (GB)'].sum()/filtered_gdf['Total PS Traffic GB'].sum()*100
+        Penetration_Volte = filtered_gdf['VoLTE_Traffic (Erlang)'].sum()/filtered_gdf['Total CS Traffic Earlang'].sum()*100      
     # Display the gauge chart in Streamlit
         with col5:
-            st.plotly_chart(gauge_chart, use_container_width=True)
-
-            value = filtered_gdf['VoLTE_Traffic (Erlang)'].sum()/filtered_gdf['Total CS Traffic Earlang'].sum()*100
-            gauge_chart = create_gauge_chart(value, 100, "Volte Traffic Penetration",50)
+            gauge_chart1 = create_gauge_chart(Penetration_5G, 100, "5G Traffic Penetration", 20)
+            st.plotly_chart(gauge_chart1, use_container_width=True)
             #add some white space 
-            st.write("")
-            st.write("")
+        st.write("")    
+        st.write("")    
 
     # Display the gauge chart in Streamlit
         with col6:
-            st.plotly_chart(gauge_chart, use_container_width=True)
+            gauge_chart2 = create_gauge_chart(Penetration_Volte, 100, "Volte Traffic Penetration",50)
+            st.plotly_chart(gauge_chart2, use_container_width=True)
+    
     dash_3 = st.container()
     with dash_3:           
 
@@ -424,21 +426,21 @@ def main():
         colors = ['green', 'yellow', 'red']
         min_value = filtered_gdf[selected_kpi].dropna().min()
         max_value = filtered_gdf[selected_kpi].dropna().max()
-    #st.write("min value and max value are ", min_value, max_value)
+    # st.write("min value and max value are ", min_value, max_value)
     # Get the index of the minimum and maximum KPI value
-        min_index = filtered_gdf[selected_kpi].idxmin()
-        max_index = filtered_gdf[selected_kpi].idxmax()
+        # min_index = filtered_gdf[selected_kpi].idxmin()
+        # max_index = filtered_gdf[selected_kpi].idxmax()
 
         # Get the corresponding sectors
-    min_sector = filtered_gdf.loc[min_index, 'Sector'] if min_index in filtered_gdf.index else None
-    max_sector = filtered_gdf.loc[max_index, 'Sector'] if max_index in filtered_gdf.index else None
+    # min_sector = filtered_gdf.loc[min_index, 'Sector'] if min_index in filtered_gdf.index else None
+    # max_sector = filtered_gdf.loc[max_index, 'Sector'] if max_index in filtered_gdf.index else None
 
     # st.write(f"Minimum {selected_kpi} value: {min_value}, Sector: {min_sector}")
     # st.write(f"Maximum {selected_kpi} value: {max_value}, Sector: {max_sector}")
-    # print("Nan count of selected KPI", filtered_gdf[selected_kpi].isna().sum())
+    print("Nan count of selected KPI", filtered_gdf[selected_kpi].isna().sum())
     colormap = cm.LinearColormap(colors, vmin=min_value, vmax=max_value)
     filtered_gdf  = filtered_gdf.drop(['Date'], axis=1)
-    folium_map = create_map(filtered_gdf, selected_kpi, show_labels, colormap)
+    folium_map = create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites)
 
     if selected_site != 'None':
         # Assuming 'lat' and 'long' are the column names for latitude and longitude in gdf
@@ -455,9 +457,12 @@ def main():
             st.write("")
             # set width of the map to auto
             folium_map.width = '100%'
-            folium_static(folium_map)
+            # st.write(filtered_gdf)
+            folium_static(folium_map, width=1200, height=600)
     else:
         print("An error occurred in creating the map.")
+    st.write("Time of execution:", time.time() - start_time)
+
     
 
     
