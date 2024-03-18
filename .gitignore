@@ -161,3 +161,6 @@ cython_debug/
 
 # Extra
 ftp
+data_pipline.exe
+dist
+build

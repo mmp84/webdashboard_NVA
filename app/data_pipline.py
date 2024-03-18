@@ -3,17 +3,23 @@ import sqlite3
 import pandas as pd
 import os
 import logging
+import sys
 
 # Set up logging
-logging.basicConfig(filename='../ftp/data/email_attachment_downloader.log', level=logging.INFO,
-                    format='%(asctime)s:%(levelname)s:%(message)s')
+script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+ftp_data_dir = os.path.join(script_dir, '..', '..','ftp', 'data')
 
-    
+log_file_path = os.path.join(ftp_data_dir, 'email_attachment_downloader.log')
+try:
+    logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s:%(levelname)s:%(message)s')  
+except Exception as e:
+    print(f"Error setting up logging: {e}")
 
-download_folder = '../ftp/data'
-csv_folder_path = '../ftp/data'
+
+download_folder = ftp_data_dir
+csv_folder_path = ftp_data_dir
 # SQLite database file
-sqlite_db_path = '../ftp/data/database.sqlite'
+sqlite_db_path = os.path.join(ftp_data_dir, 'database.sqlite')
 
 def unzip_file(file_path):
     with zipfile.ZipFile(file_path, 'r') as zip_ref:
@@ -91,11 +97,14 @@ def query_data(table_name):
         logging.error(f"Error querying {table_name} table: {e}")
 def main():
     # unzipping the file
+    #print current working directory
+    print(os.getcwd())
     for filename in os.listdir(download_folder):
         if filename.endswith('.zip'):
             file_path = os.path.join(download_folder, filename)
             unzip_file(file_path)
-            os.rename(file_path, '../ftp/data/processed/' + filename)
+            processed_folder = os.path.join(ftp_data_dir, 'processed')
+            os.rename(file_path, os.path.join(processed_folder, filename))
 
 
 
