@@ -328,13 +328,13 @@ def KPIs_of_selected_sector(gdf, sector_name, KPIs_of_interest):
     selected_sector = selected_sector[KPIs_of_interest + ['Sector', 'Date', 'Time']]
     # st.write(selected_sector.head())
     #merge data and time columns
-    # selected_sector['Date'] = selected_sector['Date'] + ' ' + selected_sector['Time']
-    # selected_sector = selected_sector.drop(['Time'], axis=1)
+    selected_sector['Date'] = selected_sector['Date'] + ' ' + selected_sector['Time']
+    selected_sector = selected_sector.drop(['Time'], axis=1)
     
     # st.write(selected_sector)
     for kpi in KPIs_of_interest:
         selected_sector[kpi] = selected_sector[kpi].round(2)
-        st.line_chart(data = selected_sector, x = 'Time', y = kpi, use_container_width=True)
+        st.line_chart(data = selected_sector, x = 'Date', y = kpi, use_container_width=True)
     return None
 
 def main():
