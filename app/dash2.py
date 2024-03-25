@@ -12,6 +12,7 @@ import branca.colormap as cm
 from folium.features import DivIcon
 import plotly.graph_objects as go
 from streamlit_autorefresh import st_autorefresh
+from datetime import datetime, timedelta
 
 st.set_page_config(layout="wide")
 st_autorefresh(interval=60 * 60 * 1000, key="dataframerefresh")
@@ -25,8 +26,8 @@ show_sites = False
 with open('app/style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 # Function to assign color based on Selected KPI
-# @st.cache_data
-def style_function(feature, selected_kpi,colormap):
+@st.cache_data
+def style_function(feature, selected_kpi,_colormap):
     try:
         sector = feature['properties'].get('Sector', 'Unknown')  # Use 'Unknown' or similar default if 'Sector' is not found
 
@@ -40,7 +41,7 @@ def style_function(feature, selected_kpi,colormap):
                 'fillOpacity': 0.7
             }
         else:
-            color = colormap(value)
+            color = _colormap(value)
             # st.write(f"Sector: {sector}, {selected_kpi}: {value}, Color: {color}")
             return {
                 'fillColor': color,
@@ -101,18 +102,24 @@ def load_site_data():
     return sitedf
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data
 def load_and_process_data():
+    # load the data from the sqlite database only last 7 days
+    seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
     tables = ['2G', '3G', '4G', '5G']  # List of table names
     # tables = ['2G']
     dataframes = {}  # Dictionary to store DataFrames
 
     with sqlite3.connect(sqlite_db_path) as conn:
+        seven_days_ago = datetime.now() - timedelta(days=7)
+        formatted_date = seven_days_ago.strftime('%m/%d/%Y')
         for table in tables:
             query = f'''
                         SELECT *
                         FROM "{table}"
-                        '''
+                        WHERE Date >= '{formatted_date}'
+                    '''            
+         
             dataframes[table] = pd.read_sql_query(query, conn)
             dataframes[table].replace('NIL', np.nan, inplace= True)
             dataframes[table].head()
@@ -120,6 +127,8 @@ def load_and_process_data():
     dataframes['3G']['Cell ID'] = dataframes['3G']['Cell ID'].astype('int64', errors='ignore')
     dataframes['4G']['LocalCell Id'] = dataframes['4G']['LocalCell Id'].astype('int64', errors='ignore')
     dataframes['5G']['NR Cell ID'] = dataframes['5G']['NR Cell ID'].astype('int64', errors='ignore')
+    dataframes['2G'].shape
+    dataframes['3G'].shape
 
 
     return dataframes
@@ -130,7 +139,9 @@ def load_and_process_data():
 @st.cache_data
 def create_kpis(df4G, df3G, df2G, df5G):
 
+    #df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
     df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
+
     # df5G['N.UL.NI.Avg(dBm)'].unique()
     df4G['Sector'] = df4G.apply(lambda row: row['eNodeB Name'][:5] + '_' + str(row['LocalCell Id'] % 3), axis=1)
     df4G['L.UL.Interference.Avg(dBm)'] = pd.to_numeric(df4G['L.UL.Interference.Avg(dBm)'], errors='coerce')
@@ -197,65 +208,79 @@ def create_kpis(df4G, df3G, df2G, df5G):
 
     return mergeddf
 # @st.cache_data
-def create_map(filtered_gdf, selected_kpi, show_labels,colormap, show_sites):
+def create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites):
     try:
-    # Create a folium map
+        # Create a folium map
         m = folium.Map(location=[filtered_gdf['lat'].mean(), filtered_gdf['long'].mean()], zoom_start=15)
+        # st_map = st_folium (m)  
 
         # Adding markers
         enodebdf = filtered_gdf.drop_duplicates('Site')
         enodebdf = enodebdf[['Site', 'lat', 'long']].reset_index()
         if selected_kpi == '4G Availability':
-            site_avg_kpi = filtered_gdf.groupby('Site')[selected_kpi].min()    
-        else: 
-            site_avg_kpi = filtered_gdf.groupby('Site')[selected_kpi].max()    
-     
+            site_avg_kpi = filtered_gdf.groupby('Site')[selected_kpi].min()
+        else:
+            site_avg_kpi = filtered_gdf.groupby('Site')[selected_kpi].max()
+
         for _, row in enodebdf.iterrows():
             avg_kpi_value = site_avg_kpi.get(row['Site'], None)
-                # Check if avg_kpi_value is NaN
+            # Check if avg_kpi_value is NaN
             if pd.isna(avg_kpi_value):
                 # If avg_kpi_value is NaN, use a default color like gray or skip this iteration
                 marker_color = 'grey'
             else:
                 marker_color = colormap(avg_kpi_value)
-            if show_sites:    
+            if show_sites:
                 folium.CircleMarker(
                     location=[row['lat'], row['long']],
                     radius=2.5,
-                    color= marker_color,
+                    color=marker_color,
                     fill=True,
-                    fill_color= marker_color,
+                    fill_color=marker_color,
                     fill_opacity=0.5,
                     popup=row['Site']
                 ).add_to(m)
             if show_labels:
                 folium.map.Marker(
                     [row['lat'], row['long']],
-                    icon=DivIcon(
-                        icon_size=(150,36),
-                        icon_anchor=(0,0),
+                    icon=folium.DivIcon(
+                        icon_size=(150, 36),
+                        icon_anchor=(0, 0),
                         html=f'<div style="font-size: 12pt">{row["Site"]}</div>'
                     )
                 ).add_to(m)
 
         # Adding the GeoJSON to the map
         filtered_gdf_geojson = filtered_gdf.to_json()
+    
+    
+    
 
-
-        folium.GeoJson(filtered_gdf_geojson, 
-                    name='sectors',
-                    # style_function= style_function,  # Ensure style_function is defined and accessible
-                    style_function=lambda feature: style_function(feature, selected_kpi,colormap),  # pass selected_kpi here
-
-                    tooltip=folium.features.GeoJsonTooltip(fields=['Sector', 'LTE DL User Throughput Mbps',
-       'LTE UL User Throughput Mbps', 'LTE PRB Utilization',
-       'Total CS Traffic Earlang', 'Total PS Traffic GB', '4G Users','4G Availability',
-       '5G Users', '3G RTWP', 'LTE UL Interference (dBm)',
-       '5G UL Interference (dBm)'], labels=True)
-                    ).add_to(m)
+        folium.GeoJson(filtered_gdf_geojson,
+                       name='sectors',
+                       style_function=lambda feature: style_function(feature, selected_kpi, colormap),
+                       tooltip=folium.features.GeoJsonTooltip(
+                           fields=['Sector', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps',
+                                   'LTE PRB Utilization', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '4G Users',
+                                   '4G Availability', '5G Users', '3G RTWP', 'LTE UL Interference (dBm)',
+                                   '5G UL Interference (dBm)'], labels=True),
+                        #   onEachFeature=whenClicked
+                        
+                       ).add_to(m)
         
-        # print(m)
-        return m
+        folium.LayerControl().add_to(m)  
+        st_map = st_folium(m, width=1200, height=600)
+        sector_name = None  
+        if st_map['last_active_drawing'] is not None:
+            sector_name = st_map['last_active_drawing']['properties']['Sector']
+        # folium_static(m, width=1200, height=600)
+  
+  
+
+        
+
+
+        return sector_name
     except Exception as e:
         print(f"Error in create_map: {e}")
         return None
@@ -298,7 +323,19 @@ def create_gauge_chart(value, max_value, title, reference):
 def get_time_options_for_date(date,gdf):
     return sorted(gdf[gdf['Date'] == date]['Time'].unique())
 
-
+def KPIs_of_selected_sector(gdf, sector_name, KPIs_of_interest):
+    selected_sector = gdf[gdf['Sector'] == sector_name]
+    selected_sector = selected_sector[KPIs_of_interest + ['Sector', 'Date', 'Time']]
+    # st.write(selected_sector.head())
+    #merge data and time columns
+    # selected_sector['Date'] = selected_sector['Date'] + ' ' + selected_sector['Time']
+    # selected_sector = selected_sector.drop(['Time'], axis=1)
+    
+    # st.write(selected_sector)
+    for kpi in KPIs_of_interest:
+        selected_sector[kpi] = selected_sector[kpi].round(2)
+        st.line_chart(data = selected_sector, x = 'Time', y = kpi, use_container_width=True)
+    return None
 
 def main():
     #timeit
@@ -310,6 +347,7 @@ def main():
     df3G = dataframes['3G']
     df4G = dataframes['4G']
     df5G = dataframes['5G']
+
     sitedf = load_site_data()
     mergeddf = create_kpis(df4G, df3G, df2G, df5G)
     # print(mergeddf.head())
@@ -440,28 +478,35 @@ def main():
     print("Nan count of selected KPI", filtered_gdf[selected_kpi].isna().sum())
     colormap = cm.LinearColormap(colors, vmin=min_value, vmax=max_value)
     filtered_gdf  = filtered_gdf.drop(['Date'], axis=1)
-    folium_map = create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites)
+    # sector_name = create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites)
 
-    if selected_site != 'None':
-        # Assuming 'lat' and 'long' are the column names for latitude and longitude in gdf
-        site_location = gdf[gdf['Site'] == selected_site][['lat', 'long']].iloc[0]
-        folium_map.location = [site_location['lat'], site_location['long']]
-    if folium_map is not None:
-        colormap = cm.LinearColormap(colors, vmin=min_value, vmax=max_value)
-        colormap.caption = selected_kpi
-        colormap.add_to(folium_map)
-        dash_4 = st.container()
-        with dash_4:
+
+    # if folium_map is not None:
+    #     colormap = cm.LinearColormap(colors, vmin=min_value, vmax=max_value)
+    #     colormap.caption = selected_kpi
+        # colormap.add_to(folium_map)
+    dash_4 = st.container()
+    with dash_4:
             # st.write(filtered_gdf)
             st.write("")
             st.write("")
             # set width of the map to auto
-            folium_map.width = '100%'
+            # folium_map.width = '100%'
             # st.write(filtered_gdf)
-            folium_static(folium_map, width=1200, height=600)
-    else:
-        print("An error occurred in creating the map.")
+            sector_name = create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites)
+            st.write("Selected Sector: ", sector_name)
+    
+    # if selected_site != 'None':
+    # # Assuming 'lat' and 'long' are the column names for latitude and longitude in gdf
+    #     site_location = gdf[gdf['Site'] == selected_site][['lat', 'long']].iloc[0]
+    #     folium_map.location = [site_location['lat'], site_location['long']]
     st.write("Time of execution:", time.time() - start_time)
+    if sector_name is not None:
+        st.subheader("Displaying KPIs of " + sector_name)
+        KPIs_of_selected_sector(gdf, sector_name, KPIs_of_interest)
+
+
+
 
     
 

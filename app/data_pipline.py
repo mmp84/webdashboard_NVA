@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import logging
 import sys
+import subprocess
 
 # Set up logging
 script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -111,6 +112,6 @@ def main():
     # Run the import process
     import_csv_files()
     query_data('4G')
-         
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
+
