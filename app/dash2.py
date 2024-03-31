@@ -14,8 +14,9 @@ import plotly.graph_objects as go
 from streamlit_autorefresh import st_autorefresh
 from datetime import datetime, timedelta
 
-st.set_page_config(layout="wide")
+st.set_page_config("Network Visual Analytics", layout="wide")
 st_autorefresh(interval=60 * 60 * 1000, key="dataframerefresh")
+APP_TITLE = "Network Visual Analytics"
 sqlite_db_path = '../ftp/data/database.sqlite'
 file_path = '/assets'
 #initiate selected_sites, show_labels and show_sites and colormap
@@ -27,9 +28,10 @@ with open('app/style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 # Function to assign color based on Selected KPI
 @st.cache_data
-def style_function(feature, selected_kpi,_colormap):
+def style_function(feature, selected_kpi, _colormap):
+    start_time = time.time()
     try:
-        sector = feature['properties'].get('Sector', 'Unknown')  # Use 'Unknown' or similar default if 'Sector' is not found
+        # sector = feature['properties'].get('Sector', 'Unknown')  # Use 'Unknown' or similar default if 'Sector' is not found
 
         value = feature['properties'].get(selected_kpi)
         if value is None or pd.isna(value):
@@ -51,11 +53,13 @@ def style_function(feature, selected_kpi,_colormap):
             }
     except Exception as e:
         print(f"Error in style_function: {e}")
-        print(f"Feature data: {feature}")    
+        print(f"Feature data: {feature}")  
+  
 
 # Function to create wedge polygons
 @st.cache_data
 def create_wedges(sitesdf):
+    start_time = time.time()
     def create_single_wedge(row):
         num_points = 30  # number of points to define the wedge
         angle_width = 65
@@ -72,7 +76,7 @@ def create_wedges(sitesdf):
 
     # start_time = time.time()
     sitesdf['geometry'] = sitesdf.apply(create_single_wedge, axis=1)
-    # st.write("Time of wedge creation:", time.time() - start_time)
+    st.write("Time of wedge creation:", time.time() - start_time)
     
     return sitesdf
 
@@ -102,7 +106,7 @@ def load_site_data():
     return sitedf
 
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_and_process_data():
     # load the data from the sqlite database only last 7 days
     seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
@@ -114,30 +118,134 @@ def load_and_process_data():
         seven_days_ago = datetime.now() - timedelta(days=7)
         formatted_date = seven_days_ago.strftime('%m/%d/%Y')
         for table in tables:
-            query = f'''
+                query = f'''
                         SELECT *
                         FROM "{table}"
                         WHERE Date >= '{formatted_date}'
-                    '''            
-         
+                    '''       
+        try:
             dataframes[table] = pd.read_sql_query(query, conn)
             dataframes[table].replace('NIL', np.nan, inplace= True)
-            dataframes[table].head()
+        except Exception as e:
+            print(f"Error while fetching data from table {table}:{e}")
+
     dataframes['2G']['Cell CI'] = dataframes['2G']['Cell CI'].astype('int64', errors='ignore')
     dataframes['3G']['Cell ID'] = dataframes['3G']['Cell ID'].astype('int64', errors='ignore')
     dataframes['4G']['LocalCell Id'] = dataframes['4G']['LocalCell Id'].astype('int64', errors='ignore')
     dataframes['5G']['NR Cell ID'] = dataframes['5G']['NR Cell ID'].astype('int64', errors='ignore')
-    dataframes['2G'].shape
-    dataframes['3G'].shape
+    # dataframes['2G'].shape
+    # dataframes['3G'].shape
 
 
     return dataframes
+#-------------------------- Sector Level Loading and Processing Data --------------------------------------------------------------
+@st.cache_data
+def load_and_process_data_sector(sector_name):
+    # load the data from the sqlite database only last 7 days
+    seven_days_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+    #take the first 5 characters of the sector name
+    sector_name = sector_name[:5]
+    st.write("Sector Name is ", sector_name)
+    tables = ['2G', '3G', '4G', '5G']
+    dataframes = {}  # Dictionary to store DataFrames
+    with sqlite3.connect(sqlite_db_path) as conn:
+        seven_days_ago = datetime.now() - timedelta(days=2)
+        formatted_date = seven_days_ago.strftime('%m/%d/%Y')
+        for table in tables:
+            query = f'''
+                        SELECT *
+                        FROM "{table}"
+                        WHERE Date == '{formatted_date}' AND "Cell Name" LIKE '{sector_name}%'
+             '''
+            # st.write(query)                  
+            dataframes[table] = pd.read_sql_query(query, conn)
+            dataframes[table].replace('NIL', np.nan, inplace= True)
+    dataframes['2G']['Cell CI'] = dataframes['2G']['Cell CI'].astype('int64', errors='ignore')
+    dataframes['3G']['Cell ID'] = dataframes['3G']['Cell ID'].astype('int64', errors='ignore')
+    dataframes['4G']['LocalCell Id'] = dataframes['4G']['LocalCell Id'].astype('int64', errors='ignore')
+    dataframes['5G']['NR Cell ID'] = dataframes['5G']['NR Cell ID'].astype('int64', errors='ignore')
+    return dataframes
+@st.cache_data
+def create_kpis_sector(df4G, df3G, df2G, df5G):
+    start_time = time.time()
+        #df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
+    if df5G is not None:
+        df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
+        df5G['N.UL.NI.Avg(dBm)'] = pd.to_numeric(df5G['N.UL.NI.Avg(dBm)'], errors='coerce')
+        grouped_df5G = df5G.groupby(['Date', 'Time', 'Sector']).agg({
+        '5G_H_Total Traffic (GB)': 'sum',
+        'N.User.NsaDc.PSCell.Avg': 'sum',
+        'N.UL.NI.Avg(dBm)': 'max'
+    }).reset_index()
+
+    else:
+        df5G = pd.DataFrame()
+    # df5G['N.UL.NI.Avg(dBm)'].unique()
+    df4G['Sector'] = df4G.apply(lambda row: row['eNodeB Name'][:5] + '_' + str(row['LocalCell Id'] % 3), axis=1)
+    df4G['L.UL.Interference.Avg(dBm)'] = pd.to_numeric(df4G['L.UL.Interference.Avg(dBm)'], errors='coerce')
+
+    # Grouping by 'Date', 'Time', 'Sector'
+    grouped_df4G = df4G.groupby(['Date', 'Time', 'Sector']).agg({
+        'Total Traffic Volume (GB)': 'sum',
+        'L.Traffic.User.Avg': 'sum',
+        'L.ChMeas.PRB.DL.Used.Avg': 'sum',
+        'L.ChMeas.PRB.DL.Avail': 'sum',
+        'L.Thrp.bits.DL(bit)': 'sum',
+        'L.Thrp.bits.DL.LastTTI(bit)': 'sum',
+        'L.Thrp.Time.DL.RmvLastTTI(ms)': 'sum',
+        'L.Thrp.bits.UL(bit)': 'sum',
+        'L.Thrp.Time.UL(ms)': 'sum',
+        'VoLTE_Traffic (Erlang)': 'sum',
+        'L.UL.Interference.Avg(dBm)': 'max', 
+        'L.Cell.Unavail.Dur.Sys(s)': 'max',
+    }).reset_index()
+    df3G['Sector'] = df3G.apply(lambda row: row['NodeB Name'][:5] + '_' + str(int(str(row['Cell ID'])[-1])-1 % 3), axis=1)
+    grouped_df3G = df3G.groupby(['Date', 'Time', 'Sector']).agg({
+        'Mab_PS total traffic_GB(GB)': 'sum',
+        'Mab_AMR.Erlang.BestCell(Erl)(Erl)': 'sum',
+        'VS.MeanRTWP(dBm)': 'max'
+    }).reset_index()
+
+  
+
+    df2G['Sector'] = df2G.apply(lambda row: row['Cell Name'][:5] + '_' + str(int(str(row['Cell CI'])[-1])-1 % 3), axis=1)
+    df2G['AM_PS Traffic MB'] = df2G['AM_PS Traffic MB'] /1000
+    df2G = df2G.rename(columns={'AM_PS Traffic MB': 'PS Traffic GB'})
+
+    mergeddf = pd.merge(grouped_df4G,grouped_df3G, on =['Date', 'Time', 'Sector'], how='outer')
+    mergeddf = pd.merge(mergeddf, df2G, on = ['Date', 'Time', 'Sector'], how='outer')
+    mergeddf = pd.merge(mergeddf, grouped_df5G, on = ['Date', 'Time', 'Sector'], how='outer')
+    Columnstodrop = ['GBSC','Cell CI', 'Cell Name', 'CellIndex', 'Integrity']
+    mergeddf = mergeddf.drop(columns= Columnstodrop).reset_index(drop=True)
+    mergeddf['L.UL.Interference.Avg(dBm)'] =  mergeddf['L.UL.Interference.Avg(dBm)'] .fillna(-120)
+    mergeddf['N.UL.NI.Avg(dBm)'] =  mergeddf['N.UL.NI.Avg(dBm)'].fillna(-116)
+    mergeddf['VS.MeanRTWP(dBm)'] =  mergeddf['VS.MeanRTWP(dBm)'].fillna(-112)
+    mergeddf = mergeddf.fillna(0)
+
+    #---------------------------------------KPI Creation -----------------------------------------------------------------------------
+    # Adding a new column 'DL User Throughput' based on the given equation
+    mergeddf['LTE DL User Throughput Mbps'] = ((mergeddf['L.Thrp.bits.DL(bit)'] - mergeddf['L.Thrp.bits.DL.LastTTI(bit)']) / 1000000) / (mergeddf['L.Thrp.Time.DL.RmvLastTTI(ms)'] / 1000)
+
+    mergeddf['LTE UL User Throughput Mbps'] = (mergeddf['L.Thrp.bits.UL(bit)'] / 1000000) / (mergeddf['L.Thrp.Time.UL(ms)'] / 1000)
+    mergeddf['LTE PRB Utilization'] = mergeddf['L.ChMeas.PRB.DL.Used.Avg']/mergeddf['L.ChMeas.PRB.DL.Avail']*100
+    mergeddf['Total CS Traffic Earlang'] = mergeddf['VoLTE_Traffic (Erlang)']+ mergeddf['K3014:Traffic Volume on TCH(Erl)'] + mergeddf['Mab_AMR.Erlang.BestCell(Erl)(Erl)']
+    mergeddf['Total PS Traffic GB'] = mergeddf['Total Traffic Volume (GB)'] + mergeddf['5G_H_Total Traffic (GB)']+mergeddf['PS Traffic GB']+ mergeddf['Mab_PS total traffic_GB(GB)']
+    mergeddf['4G Users'] = mergeddf['L.Traffic.User.Avg']
+    mergeddf['5G Users'] = mergeddf['N.User.NsaDc.PSCell.Avg']
+    mergeddf['3G RTWP'] = mergeddf['VS.MeanRTWP(dBm)']
+    mergeddf['LTE UL Interference (dBm)'] = mergeddf['L.UL.Interference.Avg(dBm)']
+    mergeddf['5G UL Interference (dBm)'] = mergeddf['N.UL.NI.Avg(dBm)']
+    mergeddf['4G Availability'] = (1 - mergeddf['L.Cell.Unavail.Dur.Sys(s)']/3600)*100
+    # st.write("Time of creating KPIs", time.time())
+    st.write("Time of creating KPIs:", time.time() - start_time)
+    return mergeddf
 
 
 
-
+#----------------------End of Sector Level Loading and Processing Data --------------------------------------------------------------
 @st.cache_data
 def create_kpis(df4G, df3G, df2G, df5G):
+    start_time = time.time()
 
     #df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
     df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
@@ -205,10 +313,11 @@ def create_kpis(df4G, df3G, df2G, df5G):
     mergeddf['5G UL Interference (dBm)'] = mergeddf['N.UL.NI.Avg(dBm)']
     mergeddf['4G Availability'] = (1 - mergeddf['L.Cell.Unavail.Dur.Sys(s)']/3600)*100
     # st.write("Time of creating KPIs", time.time())
-
+    st.write("Time of creating KPIs:", time.time() - start_time)
     return mergeddf
 # @st.cache_data
 def create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites):
+    start_time = time.time()  
     try:
         # Create a folium map
         m = folium.Map(location=[filtered_gdf['lat'].mean(), filtered_gdf['long'].mean()], zoom_start=15)
@@ -249,16 +358,28 @@ def create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites):
                         html=f'<div style="font-size: 12pt">{row["Site"]}</div>'
                     )
                 ).add_to(m)
-
+        
         # Adding the GeoJSON to the map
-        filtered_gdf_geojson = filtered_gdf.to_json()
-    
-    
-    
+        #nan count in selected KPI
+        st.write("Nan count of selected KPI", filtered_gdf[selected_kpi].isna().sum())
+        map_dict = filtered_gdf.set_index('Sector')[selected_kpi].to_dict()
+        filtered_gdf_geojson = filtered_gdf.to_json()  
+        if selected_kpi == '4G Availability':
+            linear = cm.LinearColormap(['red', 'yellow', 'green'], vmin=min(map_dict.values()), vmax=max(map_dict.values()))
+        else:
+            linear = cm.LinearColormap(['green', 'yellow', 'red'], vmin=min(map_dict.values()), vmax=max(map_dict.values()))
 
         folium.GeoJson(filtered_gdf_geojson,
                        name='sectors',
-                       style_function=lambda feature: style_function(feature, selected_kpi, colormap),
+                       style_function=lambda feature: {
+                        "fillColor": linear(feature['properties'][selected_kpi]) if feature['properties'][selected_kpi] is not None else 'lightgrey',
+                        "nan_fill_color": "lightgrey",
+                        "nan_fill_opacity": 0.7,
+                        "color": "lightgray",
+                        "weight": 0.5,
+                        "fillOpacity": 0.7
+                       },
+
                        tooltip=folium.features.GeoJsonTooltip(
                            fields=['Sector', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps',
                                    'LTE PRB Utilization', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '4G Users',
@@ -267,8 +388,10 @@ def create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites):
                         #   onEachFeature=whenClicked
                         
                        ).add_to(m)
-        
-        folium.LayerControl().add_to(m)  
+        #display legend
+        linear.add_to(m)
+
+        # folium.LayerControl().add_to(m)  
         st_map = st_folium(m, width=1200, height=600)
         sector_name = None  
         if st_map['last_active_drawing'] is not None:
@@ -279,7 +402,7 @@ def create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites):
 
         
 
-
+        st.write("Time of creating map:", time.time() - start_time)
         return sector_name
     except Exception as e:
         print(f"Error in create_map: {e}")
@@ -310,7 +433,7 @@ def create_gauge_chart(value, max_value, title, reference):
     ))
 
     # Adjust layout to fit in a single row
-    fig.update_layout(autosize=True, height=160, margin={'t': 20, 'b': 10, 'l': 10, 'r': 10})
+    fig.update_layout(autosize=True, height=160, margin={'t': 40, 'b': 10, 'l': 10, 'r': 10})
     return fig
 
 
@@ -323,79 +446,105 @@ def create_gauge_chart(value, max_value, title, reference):
 def get_time_options_for_date(date,gdf):
     return sorted(gdf[gdf['Date'] == date]['Time'].unique())
 
-def KPIs_of_selected_sector(gdf, sector_name, KPIs_of_interest):
-    selected_sector = gdf[gdf['Sector'] == sector_name]
-    selected_sector = selected_sector[KPIs_of_interest + ['Sector', 'Date', 'Time']]
-    # st.write(selected_sector.head())
-    #merge data and time columns
-    selected_sector['Date'] = selected_sector['Date'] + ' ' + selected_sector['Time']
-    selected_sector = selected_sector.drop(['Time'], axis=1)
+def KPIs_of_selected_sector(sector_name):
+    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']  # Replace with actual KPI column names
+    df = load_and_process_data_sector(sector_name)
+    df4G = df['4G']
+    df3G = df['3G']
+    df2G = df['2G']
+    df5G = df['5G']
     
-    # st.write(selected_sector)
-    for kpi in KPIs_of_interest:
-        selected_sector[kpi] = selected_sector[kpi].round(2)
-        st.line_chart(data = selected_sector, x = 'Date', y = kpi, use_container_width=True)
-    return None
 
+    #check for empty dataframes and update call to create_kpis_sector
+    if df5G.empty:
+        df5G = None
+    if df4G.empty:
+        df4G = None
+    if df3G.empty:
+        df3G = None
+    if df2G.empty:
+        df2G = None       
+    st.write("Feaure under construction")
+    # selected_sector = create_kpis_sector(df4G, df3G, df2G, df5G) 
+    # selected_sector = selected_sector[KPIs_of_interest + ['Sector', 'Date', 'Time']]
+    # # st.write(selected_sector.head())
+    # #merge data and time columns
+    # selected_sector['Date'] = selected_sector['Date'] + ' ' + selected_sector['Time']
+    # selected_sector = selected_sector.drop(['Time'], axis=1)
+    
+    # # st.write(selected_sector)
+    # for kpi in KPIs_of_interest:
+    #     selected_sector[kpi] = selected_sector[kpi].round(2)
+    #     st.line_chart(data = selected_sector, x = 'Date', y = kpi, use_container_width=True)
+    return None
+# @st.cache_data
+def display_cluster_filter(df):
+    cluster_options = [''] + list(df['Cluster'].unique())
+    cluster_index = cluster_options.index('Abha') if 'Abha' in cluster_options else 0
+    return st.sidebar.selectbox('Select Cluster', cluster_options, index=cluster_index)
+# @st.cache_data    
+def display_KPIs_filter():
+    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']  # Replace with actual KPI column names
+    return st.sidebar.selectbox('Select KPI', KPIs_of_interest)
+@st.cache_data
+def load_and_process_data_short(selected_date, selected_time):
+    start_time = time.time()
+    # load the data from the sqlite database only last 7 days
+    st.write("selected date is ", selected_date)
+    # formatted_date = selected_date.strftime('%m/%d/%Y')
+
+    tables = ['2G', '3G', '4G', '5G']  # List of table names
+    # tables = ['2G']
+    dataframes = {}  # Dictionary to store DataFrames
+    
+    with sqlite3.connect(sqlite_db_path) as conn:     
+        for table in tables:
+            query = f'''
+                        SELECT *
+                        FROM "{table}"
+                        WHERE Date == '{selected_date}' AND Time == '{selected_time}'
+                    '''            
+         
+            dataframes[table] = pd.read_sql_query(query, conn)
+            dataframes[table].replace('NIL', np.nan, inplace= True)
+            dataframes[table].head()
+    dataframes['2G']['Cell CI'] = dataframes['2G']['Cell CI'].astype('int64', errors='ignore')
+    dataframes['3G']['Cell ID'] = dataframes['3G']['Cell ID'].astype('int64', errors='ignore')
+    dataframes['4G']['LocalCell Id'] = dataframes['4G']['LocalCell Id'].astype('int64', errors='ignore')
+    dataframes['5G']['NR Cell ID'] = dataframes['5G']['NR Cell ID'].astype('int64', errors='ignore')
+    # dataframes['2G'].shape
+    # dataframes['3G'].shape
+
+    st.write("Time of loading and processing data:", time.time() - start_time)
+    return dataframes
+def date_filter():
+    #last 7 days
+    return ['03/21/2024', '03/22/2024', '03/23/2024', '03/24/2024', '03/25/2024', '03/26/2024', '03/27/2024', '03/28/2024']
+
+def time_filter():
+    return ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00']
 def main():
+    # st.set_page_config(APP_TITLE,layout="wide")
     #timeit
     start_time = time.time()
-
-    dataframes = load_and_process_data()
-    # Accessing the individual dataframes
-    df2G = dataframes['2G']
-    df3G = dataframes['3G']
-    df4G = dataframes['4G']
-    df5G = dataframes['5G']
-
+  
+    st.title(APP_TITLE)
     sitedf = load_site_data()
-    mergeddf = create_kpis(df4G, df3G, df2G, df5G)
-    # print(mergeddf.head())
-    # # null count in mergeddf
-    # print(mergeddf.isna().sum())
-
-    # export mergeddf to csv
-    # mergeddf.to_csv(file_path + '/mergeddf.csv', index=False)
-   
-    site_df = create_wedges(sitedf)
-    # st.write("wedges done")
-
-    Sites_KPIs_df = pd.merge(site_df, mergeddf, on = 'Sector')
-    # copy Sites_KPIs_df to gdf (new dataframe)
-    # gdf = Sites_KPIs_df.copy()
-    gdf = gpd.GeoDataFrame(Sites_KPIs_df, geometry= 'geometry')
-    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']  # Replace with actual KPI column names
-
-    cluster_options = gdf['Cluster'].unique()
-    cluster_options = ['All Network'] + list(cluster_options)
-    default_cluster_index = cluster_options.index('Abha') if 'Abha' in cluster_options else 0
-    site_options = ['None'] + list(gdf['Site'].unique())
-    gdf['Date'] = pd.to_datetime(gdf['Date']).dt.strftime('%Y-%m-%d')
-
-    Date_options = gdf['Date'].unique()
-    Time_options = gdf['Time'].unique()
-    Date_options = sorted(Date_options)  
-
-
-    #------------------------------------Layout----------------------------------------------------
-    dash_1 = st.container()
-    with dash_1:
-        st.markdown("<h1 style='text-align: center; background-color: #ADD8E6;'>Network Visual Analytics</h1>", unsafe_allow_html=True)
-        st.write("")
-        st.write("")
-        st.write("")     
-        
+    selected_cluster = display_cluster_filter(sitedf)
+    selected_kpi = display_KPIs_filter()
+    Date_options = date_filter()
+    Time_options = time_filter()
     with st.sidebar.expander("Select Data", expanded= True):
         st.write("")         
-        selected_kpi = st.selectbox('Select KPI', KPIs_of_interest)
-        selected_cluster = st.selectbox('Select Cluster', cluster_options, index=default_cluster_index)  
+        # selected_kpi = st.selectbox('Select KPI', KPIs_of_interest)
+        # selected_cluster = st.selectbox('Select Cluster', cluster_options, index=default_cluster_index)  
         selected_date = st.selectbox('Select Date', Date_options, index=len(Date_options) - 1)
 
-        Time_options = get_time_options_for_date(selected_date, gdf)
+        # Time_options = get_time_options_for_date(selected_date, gdf)
         # default_date_index = np.where(Date_options == Date_options.max())[0][0]
         # default_time_index = np.where(Time_options == Time_options.max())[0][0]
         # Get time options for the selected date
-     
+        
 
         # Check if there are any time options for the selected date
         if Time_options:
@@ -406,15 +555,64 @@ def main():
             # Handle the case where no times are available for the selected date
             st.write("No times available for the selected date.")
             selected_time = None  # Or 
-        selected_site = st.selectbox('Select Site', site_options, index=0)
-        show_labels = st.checkbox("Show Site Labels", value=False)
-        show_sites = st.checkbox("Show Site Markers", value = False )
 
-    filtered_gdf = gdf[(gdf['Date'] == selected_date) & (gdf['Time'] == selected_time)]
+    # dataframes = load_and_process_data()
+    dataframes = load_and_process_data_short(selected_date, selected_time)
+    # Accessing the individual dataframes
+    df2G = dataframes['2G']
+    df3G = dataframes['3G']
+    df4G = dataframes['4G']
+    df5G = dataframes['5G']
+    # st.write(df4G.head())   
+
+    mergeddf = create_kpis(df4G, df3G, df2G, df5G)
+    # print(mergeddf.head())
+    # # null count in mergeddf
+    # print(mergeddf.isna().sum())
+
+    # export mergeddf to csv
+    # mergeddf.to_csv(file_path + '/mergeddf.csv', index=False)
+
+   
+    site_df = create_wedges(sitedf)
+    # st.write("wedges done")
+
+    Sites_KPIs_df = pd.merge(site_df, mergeddf, on = 'Sector')
+    # copy Sites_KPIs_df to gdf (new dataframe)
+    # gdf = Sites_KPIs_df.copy()
+    gdf = gpd.GeoDataFrame(Sites_KPIs_df, geometry= 'geometry')
+
+    # cluster_options = gdf['Cluster'].unique()
+    # cluster_options = ['All Network'] + list(cluster_options)
+    # default_cluster_index = cluster_options.index('Abha') if 'Abha' in cluster_options else 0
+    site_options = ['None'] + list(gdf['Site'].unique())
+    gdf['Date'] = pd.to_datetime(gdf['Date']).dt.strftime('%Y-%m-%d')
+
+    # Date_options = gdf['Date'].unique()
+    # Time_options = gdf['Time'].unique()
+    # Date_options = sorted(Date_options)  
+   
+
+
+    #------------------------------------Layout----------------------------------------------------
+    dash_1 = st.container()
+    with dash_1:
+        # st.markdown("<h1 style='text-align: center; background-color: #ADD8E6;'>Network Visual Analytics</h1>", unsafe_allow_html=True)
+        # st.write("")
+        # st.write("")
+        st.write("")     
+        
+
+    selected_site = st.sidebar.selectbox('Select Site', site_options, index=0)
+    show_labels = st.sidebar.checkbox("Show Site Labels", value=False)
+    show_sites = st.sidebar.checkbox("Show Site Markers", value = False )
+
+    filtered_gdf = gdf.copy()
+    # st.write("filtered_gdf", filtered_gdf.head())
     # st.write("filtered_gdf", filtered_gdf.head())
 
      
-    if selected_cluster != 'All Network':
+    if selected_cluster != '':
         filtered_gdf = filtered_gdf[filtered_gdf['Cluster'] == selected_cluster]
     else:
         filtered_gdf = filtered_gdf  # Use the entire GeoDataFrame
@@ -475,7 +673,7 @@ def main():
 
     # st.write(f"Minimum {selected_kpi} value: {min_value}, Sector: {min_sector}")
     # st.write(f"Maximum {selected_kpi} value: {max_value}, Sector: {max_sector}")
-    print("Nan count of selected KPI", filtered_gdf[selected_kpi].isna().sum())
+    # print("Nan count of selected KPI", filtered_gdf[selected_kpi].isna().sum())
     colormap = cm.LinearColormap(colors, vmin=min_value, vmax=max_value)
     filtered_gdf  = filtered_gdf.drop(['Date'], axis=1)
     # sector_name = create_map(filtered_gdf, selected_kpi, show_labels, colormap, show_sites)
@@ -500,10 +698,10 @@ def main():
     # # Assuming 'lat' and 'long' are the column names for latitude and longitude in gdf
     #     site_location = gdf[gdf['Site'] == selected_site][['lat', 'long']].iloc[0]
     #     folium_map.location = [site_location['lat'], site_location['long']]
-    st.write("Time of execution:", time.time() - start_time)
+    st.write("Time of overall execution:", time.time() - start_time)
     if sector_name is not None:
         st.subheader("Displaying KPIs of " + sector_name)
-        KPIs_of_selected_sector(gdf, sector_name, KPIs_of_interest)
+        KPIs_of_selected_sector(sector_name)
 
 
 
