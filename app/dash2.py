@@ -424,8 +424,8 @@ def create_map(filtered_gdf, selected_kpi, show_labels, show_sites, selected_sit
 
         # folium.LayerControl().add_to(m)  
         # with st.form(key='my_form'):
-        st_map = st_folium(m, width=1200, height=600, returned_objects=["last_active_drawing"])
-        sector_name = None  
+        sector_name = None
+        st_map = st_folium(m, width=1200, height=600, returned_objects= ["last_active_drawing"])
         if st_map['last_active_drawing'] is not None:
             sector_name = st_map['last_active_drawing']['properties']['Sector']
             # st.form_submit_button(label='Refresh Map', disabled= True)
