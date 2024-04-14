@@ -5,6 +5,7 @@ import streamlit as st
 from streamlit_folium import folium_static, st_folium
 import folium
 from folium.plugins import HeatMap
+from folium.plugins import GroupedLayerControl
 import geopandas as gpd 
 import pandas as pd
 from shapely.geometry import Point, Polygon
@@ -14,6 +15,8 @@ from folium.features import DivIcon
 import plotly.graph_objects as go
 from streamlit_autorefresh import st_autorefresh
 from datetime import datetime, timedelta
+import plotly.express as px
+from plotly.subplots import make_subplots
 
 st.set_page_config("Network Visual Analytics", layout="wide")
 st_autorefresh(interval=60 * 60 * 1000, key="dataframerefresh")
@@ -165,10 +168,10 @@ def load_and_process_data_sector(sector_name):
     dataframes['3G']['Cell ID'] = dataframes['3G']['Cell ID'].astype('int64', errors='ignore')
     dataframes['4G']['LocalCell Id'] = dataframes['4G']['LocalCell Id'].astype('int64', errors='ignore')
     dataframes['5G']['NR Cell ID'] = dataframes['5G']['NR Cell ID'].astype('int64', errors='ignore')
+    # st.write(dataframes['4G'].head(21))   
     return dataframes
 @st.cache_data
 def create_kpis_sector(df4G, df3G, df2G, df5G):
-    start_time = time.time()
         #df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
     if df5G.empty == False:
         df5G['Sector'] = df5G.apply(lambda row: row['gNodeB Name'][:5] + '_' + str(row['NR Cell ID'] % 3), axis=1)
@@ -341,7 +344,7 @@ def create_kpis(df4G, df3G, df2G, df5G):
     # st.write("Time of creating KPIs:", time.time() - start_time)
     return mergeddf
 # @st.cache_data
-def create_map(filtered_gdf, selected_kpi, show_labels, show_sites, selected_site):
+def create_map(filtered_gdf, selected_kpi, selected_site):
     # start_time = time.time() 
     try:
         # Create a folium map
@@ -365,7 +368,8 @@ def create_map(filtered_gdf, selected_kpi, show_labels, show_sites, selected_sit
             site_avg_kpi = filtered_gdf.groupby('Site')[selected_kpi].max()
             linear = cm.LinearColormap(['green', 'yellow', 'red'], vmin=min(map_dict.values()), vmax=max(map_dict.values()))
 
-
+        fg3 = folium.FeatureGroup(name='Labels', show=False)
+        fg4 = folium.FeatureGroup(name='Sites', show=False)
         for _, row in enodebdf.iterrows():
             avg_kpi_value = site_avg_kpi.get(row['Site'], None)
             # Check if avg_kpi_value is NaN
@@ -374,8 +378,7 @@ def create_map(filtered_gdf, selected_kpi, show_labels, show_sites, selected_sit
                 marker_color = 'grey'
             else:
                 marker_color = linear(avg_kpi_value)
-            if show_sites:
-                folium.CircleMarker(
+            folium.CircleMarker(
                     location=[row['lat'], row['long']],
                     radius=2.5,
                     color=marker_color,
@@ -383,22 +386,19 @@ def create_map(filtered_gdf, selected_kpi, show_labels, show_sites, selected_sit
                     fill_color=marker_color,
                     fill_opacity=0.5,
                     popup=row['Site']
-                ).add_to(m)
-            if show_labels:
-                folium.map.Marker(
+                ).add_to(fg4)
+            folium.map.Marker(
                     [row['lat'], row['long']],
                     icon=folium.DivIcon(
                         icon_size=(150, 36),
                         icon_anchor=(0, 0),
                         html=f'<div style="font-size: 12pt">{row["Site"]}</div>'
                     )
-                ).add_to(m)
-        
-        # Adding the GeoJSON to the map
-        #nan count in selected KPI
-        # st.write("Nan count of selected KPI", filtered_gdf[selected_kpi].isna().sum())
+                ).add_to(fg3)
+     
         filtered_gdf_geojson = filtered_gdf.to_json()  
-        
+
+        fg1 = folium.FeatureGroup(name='Sectors', show=True)
 
         folium.GeoJson(filtered_gdf_geojson,
                     name='sectors',
@@ -418,14 +418,43 @@ def create_map(filtered_gdf, selected_kpi, show_labels, show_sites, selected_sit
                                 '5G UL Interference (dBm)'], labels=True),
                         #   onEachFeature=whenClicked
                         
-                    ).add_to(m)
+                    ).add_to(fg1)
         #display legend
         linear.add_to(m)
 
-        # folium.LayerControl().add_to(m)  
-        # with st.form(key='my_form'):
+        # for every lat and long in filtered_gdf take max of selected_kpi
+        if selected_kpi == '4G Availability':
+            df = filtered_gdf.groupby(['lat', 'long'])[selected_kpi].min().reset_index().dropna()
+        else:
+            df = filtered_gdf.groupby(['lat', 'long'])[selected_kpi].max().reset_index().dropna()
+
+        if selected_kpi == '4G Availability':
+            df[selected_kpi] = df[selected_kpi].apply(lambda x: abs(x-100))       
+        if selected_kpi == 'LTE UL Interference (dBm)':
+            df[selected_kpi] = df[selected_kpi].apply(lambda x: 0 if x <= -105 else x + 105)
+        if selected_kpi == '5G UL Interference (dBm)':
+            df[selected_kpi] = df[selected_kpi].apply(lambda x: 0 if x <= -105 else x + 105)
+        if selected_kpi == '3G RTWP':
+            df[selected_kpi] = df[selected_kpi].apply(lambda x: 0 if x <= -95 else x + 95)
+        # st.write df at sector_index
+        fg2 = folium.FeatureGroup(name='Heat Map', show=False)
+
+        HeatMap(df, min_opacity= 0.05, max_opacity= 0.9, use_local_extrema = False).add_to(folium.FeatureGroup(name='Heat Map', show=True).add_to(fg2)) 
+        m.add_child(fg1)
+        m.add_child(fg2)
+        m.add_child(fg3)
+        m.add_child(fg4)
+        folium.LayerControl(collapsed=False).add_to(m)
+        GroupedLayerControl(
+            groups={'Layers': [fg1, fg2, fg3, fg4]},
+            exclusive_groups=False,
+            collapsed=False,
+        ).add_to(m)
+
+   
         sector_name = None
-        st_map = st_folium(m, width=1200, height=600, returned_objects= ["last_active_drawing"])
+        st_map = st_folium(m, returned_objects= ["last_active_drawing"], use_container_width=True)   
+
         if st_map['last_active_drawing'] is not None:
             sector_name = st_map['last_active_drawing']['properties']['Sector']
             # st.form_submit_button(label='Refresh Map', disabled= True)
@@ -482,23 +511,61 @@ def create_gauge_chart(value, max_value, title, reference):
 # Sort the options if they are not already sorted
 def get_time_options_for_date(date,gdf):
     return sorted(gdf[gdf['Date'] == date]['Time'].unique())
-
 def KPIs_of_selected_sector(sector_name):
     KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']  # Replace with actual KPI column names
     df = load_and_process_data_sector(sector_name)
     df4G = df['4G']
     df3G = df['3G']
     df2G = df['2G']
-    df5G = df['5G']    
+    df5G = df['5G']  
+
+
     selected_sector = create_kpis_sector(df4G, df3G, df2G, df5G) 
     selected_sector = selected_sector[KPIs_of_interest + ['Sector', 'Date', 'Time']]
+    col1,col2,col3 = st.columns(3, gap="medium")    
+    with col1.container(border=True):
+        cs2gtraffic = df['2G']['K3014:Traffic Volume on TCH(Erl)'].sum()
+        cs3gtraffic = df['3G']['Mab_AMR.Erlang.BestCell(Erl)(Erl)'].sum()
+        cs4gtraffic = df['4G']['VoLTE_Traffic (Erlang)'].sum()
+        # pie chart
+        fig = px.pie(values=[cs2gtraffic, cs3gtraffic, cs4gtraffic], names=['2G', '3G', '4G'], title='Total CS Traffic Erlang')
+        st.plotly_chart(fig, use_container_width=True)
+    with col2.container(border=True):
+        # ps2gtraffic = df['2G']['AM_PS Traffic MB'].sum()/1000
+        ps3gtraffic = df['3G']['Mab_PS total traffic_GB(GB)'].sum()
+        ps4gtraffic = df['4G']['Total Traffic Volume (GB)'].sum()
+        ps5gtraffic = df['5G']['5G_H_Total Traffic (GB)'].sum()
+        # pie chart
+        fig = px.pie(values=[ps3gtraffic, ps4gtraffic, ps5gtraffic], names=['3G', '4G', '5G'], title='Total PS Traffic GB')
+        st.plotly_chart(fig, use_container_width=True)
+    with col3.container(border=True):
+        outagecount4G_date = df['4G'][df['4G']['L.Cell.Unavail.Dur.Sys(s)'] != 0].groupby('Date').size().reset_index(name='Outage Count')  
+        outageduration4G_date = df['4G'].groupby('Date')['L.Cell.Unavail.Dur.Sys(s)'].sum().reset_index(name='Outage Duration')
+        #merge the two dataframes
+        outagecount4G_date = pd.merge(outagecount4G_date, outageduration4G_date, on='Date')  
+        if outagecount4G_date.empty:
+            st.write("    No Outage    ")
+        else: 
+            # chart for outage count and duration
+            fig = make_subplots(specs=[[{"secondary_y": True}]])
+            fig.add_trace(go.Bar(x=outagecount4G_date['Date'], y=outagecount4G_date['Outage Count'], name='Outage Count', marker_color='blue'), secondary_y=False)
+            fig.add_trace(go.Scatter(x=outagecount4G_date['Date'], y=outagecount4G_date['Outage Duration'], mode='lines+markers', name='Outage Duration', marker_color='red'), secondary_y=True)
+            fig.update_layout(title='4G Outage Count and Duration', xaxis_title='Date', yaxis_title='Outage Count', yaxis2_title='Outage Duration (s)', legend=dict(x=0.7, y=1.1))
+            st.plotly_chart(fig, use_container_width=True)
+    st.subheader("Sector Level KPIs")   
+            
     # #merge data and time columns
     selected_sector['Date'] = selected_sector['Date'] + ' ' + selected_sector['Time']
     selected_sector = selected_sector.drop(['Time'], axis=1)
-    selected_sector = selected_sector[selected_sector['Sector'] == sector_name]
+    sector_chioces = selected_sector['Sector'].unique()
+    sector = st.radio("Select Sector", sector_chioces, horizontal= True)
+    if sector:
+        selected_sector = selected_sector[selected_sector['Sector'] == sector]
+    # selected_sector = selected_sector[selected_sector['Sector'] == sector_name]
     for kpi in KPIs_of_interest:
         selected_sector[kpi] = selected_sector[kpi].round(2)
-        st.line_chart(data = selected_sector, x = 'Date', y = kpi, use_container_width=True)
+        container = st.container(border = True)
+        container.line_chart(data=selected_sector, x='Date', y=kpi, use_container_width=True)
     return None
 # @st.cache_data
 def display_cluster_filter(df):
@@ -645,8 +712,8 @@ def main():
             
 
         selected_site = st.sidebar.selectbox('Select Site', site_options, index=0)
-        show_labels = st.sidebar.checkbox("Show Site Labels", value=False)
-        show_sites = st.sidebar.checkbox("Show Site Markers", value = False )
+        # show_labels = st.sidebar.checkbox("Show Site Labels", value=False)
+        # show_sites = st.sidebar.checkbox("Show Site Markers", value = False )
 
         filtered_gdf = gdf.copy()
         # st.write("filtered_gdf", filtered_gdf.head())
@@ -666,23 +733,22 @@ def main():
 
         filtered_gdf[numeric_cols] = filtered_gdf[numeric_cols].round(2)
         # -----------------------------------------Guage Charts------------------------------------------------
-        dash_2 = st.container()
-        with dash_2:
-            col5, col6 =  st.columns(2)
-            Penetration_5G = filtered_gdf['5G_H_Total Traffic (GB)'].sum()/filtered_gdf['Total PS Traffic GB'].sum()*100
-            Penetration_Volte = filtered_gdf['VoLTE_Traffic (Erlang)'].sum()/filtered_gdf['Total CS Traffic Earlang'].sum()*100      
-        # Display the gauge chart in Streamlit
-            with col5:
-                gauge_chart1 = create_gauge_chart(Penetration_5G, 100, "5G Traffic Penetration", 20)
-                st.plotly_chart(gauge_chart1, use_container_width=True)
-                #add some white space 
-            st.write("")    
-            st.write("")    
+     
+        col5, col6 =  st.columns(2)
+        Penetration_5G = filtered_gdf['5G_H_Total Traffic (GB)'].sum()/filtered_gdf['Total PS Traffic GB'].sum()*100
+        Penetration_Volte = filtered_gdf['VoLTE_Traffic (Erlang)'].sum()/filtered_gdf['Total CS Traffic Earlang'].sum()*100      
+    # Display the gauge chart in Streamlit
+        with col5.container(border=True):
+            gauge_chart1 = create_gauge_chart(Penetration_5G, 100, "5G Traffic Penetration", 20)
+            st.plotly_chart(gauge_chart1, use_container_width=True)
+            #add some white space 
+        st.write("")    
+        st.write("")    
 
         # Display the gauge chart in Streamlit
-            with col6:
-                gauge_chart2 = create_gauge_chart(Penetration_Volte, 100, "Volte Traffic Penetration",50)
-                st.plotly_chart(gauge_chart2, use_container_width=True)
+        with col6.container(border=True):
+            gauge_chart2 = create_gauge_chart(Penetration_Volte, 100, "Volte Traffic Penetration",50)
+            st.plotly_chart(gauge_chart2, use_container_width=True)
         
         dash_3 = st.container()
         with dash_3:           
@@ -724,26 +790,11 @@ def main():
         #     colormap = cm.LinearColormap(colors, vmin=min_value, vmax=max_value)
         #     colormap.caption = selected_kpi
             # colormap.add_to(folium_map)
-        dash_4 = st.container()
-        with dash_4:
-                # st.write(filtered_gdf)
-                st.write("")
-                st.write("")
-                # set width of the map to auto
-                # folium_map.width = '100%'
-                # st.write(filtered_gdf)
-                sector_name = create_map(filtered_gdf, selected_kpi, show_labels, show_sites, selected_site)
-                # sector_name = show_map(m)
-                
-                # st.write("Selected Sector: ", sector_name)
-        
-        # if selected_site != 'None':
-        # # Assuming 'lat' and 'long' are the column names for latitude and longitude in gdf
-        #     site_location = gdf[gdf['Site '] == selected_site][['lat', 'long']].iloc[0]
-        #     folium_map.location = [site_location['lat'], site_location['long']]
-        # st.write("Time of overall execution:", time.time() - start_time)
+       
+        sector_name = create_map(filtered_gdf, selected_kpi, selected_site)
+   
         if sector_name is not None:
-            st.subheader("Displaying KPIs of " + sector_name)
+            st.subheader("Displaying KPIs of " + sector_name[:5])
             KPIs_of_selected_sector(sector_name)
 
   
