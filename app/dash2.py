@@ -245,10 +245,10 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
     # st.write(mergeddf.columns)
     Columnstodrop = ['GBSC','Cell CI', 'Cell Name', 'CellIndex', 'Integrity']
     mergeddf = mergeddf.drop(columns= Columnstodrop).reset_index(drop=True)
-    mergeddf['L.UL.Interference.Avg(dBm)'] =  mergeddf['L.UL.Interference.Avg(dBm)'] .fillna(-120)
-    mergeddf['N.UL.NI.Avg(dBm)'] =  mergeddf['N.UL.NI.Avg(dBm)'].fillna(-116)
-    mergeddf['VS.MeanRTWP(dBm)'] =  mergeddf['VS.MeanRTWP(dBm)'].fillna(-112)
-    mergeddf = mergeddf.fillna(0)
+    # mergeddf['L.UL.Interference.Avg(dBm)'] =  mergeddf['L.UL.Interference.Avg(dBm)'] .fillna(-120)
+    # mergeddf['N.UL.NI.Avg(dBm)'] =  mergeddf['N.UL.NI.Avg(dBm)'].fillna(-116)
+    # mergeddf['VS.MeanRTWP(dBm)'] =  mergeddf['VS.MeanRTWP(dBm)'].fillna(-112)
+    # mergeddf = mergeddf.fillna(0)
 
     #---------------------------------------KPI Creation -----------------------------------------------------------------------------
     # Adding a new column 'DL User Throughput' based on the given equation
@@ -256,8 +256,15 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
 
     mergeddf['LTE UL User Throughput Mbps'] = (mergeddf['L.Thrp.bits.UL(bit)'] / 1000000) / (mergeddf['L.Thrp.Time.UL(ms)'] / 1000)
     mergeddf['LTE PRB Utilization'] = mergeddf['L.ChMeas.PRB.DL.Used.Avg']/mergeddf['L.ChMeas.PRB.DL.Avail']*100
-    mergeddf['Total CS Traffic Earlang'] = mergeddf['VoLTE_Traffic (Erlang)']+ mergeddf['K3014:Traffic Volume on TCH(Erl)'] + mergeddf['Mab_AMR.Erlang.BestCell(Erl)(Erl)']
-    mergeddf['Total PS Traffic GB'] = mergeddf['Total Traffic Volume (GB)'] + mergeddf['5G_H_Total Traffic (GB)']+mergeddf['PS Traffic GB']+ mergeddf['Mab_PS total traffic_GB(GB)']
+    # mergeddf['Total CS Traffic Earlang'] = mergeddf['VoLTE_Traffic (Erlang)']+ mergeddf['K3014:Traffic Volume on TCH(Erl)'] + mergeddf['Mab_AMR.Erlang.BestCell(Erl)(Erl)']
+    mergeddf['Total CS Traffic Earlang'] = np.nan_to_num(mergeddf['VoLTE_Traffic (Erlang)'], nan=0) + \
+                                       np.nan_to_num(mergeddf['K3014:Traffic Volume on TCH(Erl)'], nan=0) + \
+                                       np.nan_to_num(mergeddf['Mab_AMR.Erlang.BestCell(Erl)(Erl)'], nan=0)
+    # mergeddf['Total PS Traffic GB'] = mergeddf['Total Traffic Volume (GB)'] + mergeddf['5G_H_Total Traffic (GB)']+mergeddf['PS Traffic GB']+ mergeddf['Mab_PS total traffic_GB(GB)']
+    mergeddf['Total PS Traffic GB'] = np.nan_to_num(mergeddf['Total Traffic Volume (GB)'], nan=0) + \
+                                  np.nan_to_num(mergeddf['5G_H_Total Traffic (GB)'], nan=0) + \
+                                  np.nan_to_num(mergeddf['PS Traffic GB'], nan=0) + \
+                                  np.nan_to_num(mergeddf['Mab_PS total traffic_GB(GB)'], nan=0)
     mergeddf['4G Users'] = mergeddf['L.Traffic.User.Avg']
     mergeddf['5G Users'] = mergeddf['N.User.NsaDc.PSCell.Avg']
     mergeddf['3G RTWP'] = mergeddf['VS.MeanRTWP(dBm)']
@@ -321,10 +328,11 @@ def create_kpis(df4G, df3G, df2G, df5G):
     mergeddf = pd.merge(mergeddf, grouped_df5G, on = ['Date', 'Time', 'Sector'], how='outer')
     Columnstodrop = ['GBSC','Cell CI', 'Cell Name', 'CellIndex', 'Integrity']
     mergeddf = mergeddf.drop(columns= Columnstodrop).reset_index(drop=True)
-    mergeddf['L.UL.Interference.Avg(dBm)'] =  mergeddf['L.UL.Interference.Avg(dBm)'] .fillna(-120)
-    mergeddf['N.UL.NI.Avg(dBm)'] =  mergeddf['N.UL.NI.Avg(dBm)'].fillna(-116)
-    mergeddf['VS.MeanRTWP(dBm)'] =  mergeddf['VS.MeanRTWP(dBm)'].fillna(-112)
-    mergeddf = mergeddf.fillna(0)
+    # mergeddf['L.UL.Interference.Avg(dBm)'] =  mergeddf['L.UL.Interference.Avg(dBm)'] .fillna(-120)
+    # mergeddf['N.UL.NI.Avg(dBm)'] =  mergeddf['N.UL.NI.Avg(dBm)'].fillna(-116)
+    # mergeddf['VS.MeanRTWP(dBm)'] =  mergeddf['VS.MeanRTWP(dBm)'].fillna(-112)
+    # mergeddf = mergeddf.fillna(0)
+
 
     #---------------------------------------KPI Creation -----------------------------------------------------------------------------
     # Adding a new column 'DL User Throughput' based on the given equation
@@ -332,8 +340,17 @@ def create_kpis(df4G, df3G, df2G, df5G):
 
     mergeddf['LTE UL User Throughput Mbps'] = (mergeddf['L.Thrp.bits.UL(bit)'] / 1000000) / (mergeddf['L.Thrp.Time.UL(ms)'] / 1000)
     mergeddf['LTE PRB Utilization'] = mergeddf['L.ChMeas.PRB.DL.Used.Avg']/mergeddf['L.ChMeas.PRB.DL.Avail']*100
-    mergeddf['Total CS Traffic Earlang'] = mergeddf['VoLTE_Traffic (Erlang)']+ mergeddf['K3014:Traffic Volume on TCH(Erl)'] + mergeddf['Mab_AMR.Erlang.BestCell(Erl)(Erl)']
-    mergeddf['Total PS Traffic GB'] = mergeddf['Total Traffic Volume (GB)'] + mergeddf['5G_H_Total Traffic (GB)']+mergeddf['PS Traffic GB']+ mergeddf['Mab_PS total traffic_GB(GB)']
+    # mergeddf['Total CS Traffic Earlang'] = mergeddf['VoLTE_Traffic (Erlang)']+ mergeddf['K3014:Traffic Volume on TCH(Erl)'] + mergeddf['Mab_AMR.Erlang.BestCell(Erl)(Erl)']
+    mergeddf['Total CS Traffic Earlang'] = np.nan_to_num(mergeddf['VoLTE_Traffic (Erlang)'], nan=0) + \
+                                       np.nan_to_num(mergeddf['K3014:Traffic Volume on TCH(Erl)'], nan=0) + \
+                                       np.nan_to_num(mergeddf['Mab_AMR.Erlang.BestCell(Erl)(Erl)'], nan=0)
+   
+    
+    mergeddf['Total PS Traffic GB'] = np.nan_to_num(mergeddf['Total Traffic Volume (GB)'], nan=0) + \
+                                  np.nan_to_num(mergeddf['5G_H_Total Traffic (GB)'], nan=0) + \
+                                  np.nan_to_num(mergeddf['PS Traffic GB'], nan=0) + \
+                                  np.nan_to_num(mergeddf['Mab_PS total traffic_GB(GB)'], nan=0)
+    
     mergeddf['4G Users'] = mergeddf['L.Traffic.User.Avg']
     mergeddf['5G Users'] = mergeddf['N.User.NsaDc.PSCell.Avg']
     mergeddf['3G RTWP'] = mergeddf['VS.MeanRTWP(dBm)']
@@ -352,26 +369,29 @@ def create_map(filtered_gdf, selected_kpi, selected_site):
             location = filtered_gdf[filtered_gdf['Site'] == selected_site][['lat','long']].values[0]
         else:
             location = [filtered_gdf['lat'].mean(), filtered_gdf['long'].mean()]
-        m = folium.Map(location= location, zoom_start=15, prefer_canvas=True)
-        # st_map = st_folium (m)  
-
+        m = folium.Map(location= location, zoom_start=15, prefer_canvas=True, tiles='cartodbpositron')
         # Adding markers
         enodebdf = filtered_gdf.drop_duplicates('Site')
         enodebdf = enodebdf[['Site', 'lat', 'long']].reset_index()
-        map_dict = filtered_gdf.set_index('Sector')[selected_kpi].to_dict()
+        valid_kpi_values = filtered_gdf[selected_kpi].dropna()
+        min_kpi_value = valid_kpi_values.min()
+        max_kpi_value = valid_kpi_values.max()
 
-        if selected_kpi == '4G Availability':
+        
+        # map_dict = filtered_gdf.set_index('Sector')[selected_kpi].to_dict()          
+
+        if selected_kpi == '4G Availability':            
             site_avg_kpi = filtered_gdf.groupby('Site')[selected_kpi].min()
-            linear = cm.LinearColormap(['red', 'orange','yellow', 'green'], index= [50,75,99.5,100], vmin = 0, vmax=100)
-
+            linear = cm.LinearColormap(['red', 'orange', 'yellow', 'green'], index= [50,75,99.5,100], vmin = 0, vmax=100)
         else:
             site_avg_kpi = filtered_gdf.groupby('Site')[selected_kpi].max()
-            linear = cm.LinearColormap(['green', 'yellow', 'red'], vmin=min(map_dict.values()), vmax=max(map_dict.values()))
+            linear = cm.LinearColormap(['green', 'yellow', 'red'], vmin=min_kpi_value, vmax=max_kpi_value)
 
         fg3 = folium.FeatureGroup(name='Labels', show=False)
         fg4 = folium.FeatureGroup(name='Sites', show=False)
         for _, row in enodebdf.iterrows():
             avg_kpi_value = site_avg_kpi.get(row['Site'], None)
+            # st.write(avg_kpi_value)
             # Check if avg_kpi_value is NaN
             if pd.isna(avg_kpi_value):
                 # If avg_kpi_value is NaN, use a default color like gray or skip this iteration
@@ -463,6 +483,12 @@ def create_map(filtered_gdf, selected_kpi, selected_site):
         return sector_name
  
     except Exception as e:
+        import sys
+        # print line number that error occurred
+        # exc_type, exc_obj, tb = sys.exc_info()
+        # lineno = tb.tb_lineno
+        # print(lineno)
+        
         print(f"Error in create_map: {e}")
         return None
 
@@ -518,6 +544,7 @@ def KPIs_of_selected_sector(sector_name):
     df3G = df['3G']
     df2G = df['2G']
     df5G = df['5G']  
+    # st.write(df4G['Date'].unique()) 
 
 
     selected_sector = create_kpis_sector(df4G, df3G, df2G, df5G) 
@@ -542,7 +569,9 @@ def KPIs_of_selected_sector(sector_name):
         outagecount4G_date = df['4G'][df['4G']['L.Cell.Unavail.Dur.Sys(s)'] != 0].groupby('Date').size().reset_index(name='Outage Count')  
         outageduration4G_date = df['4G'].groupby('Date')['L.Cell.Unavail.Dur.Sys(s)'].sum().reset_index(name='Outage Duration')
         #merge the two dataframes
-        outagecount4G_date = pd.merge(outagecount4G_date, outageduration4G_date, on='Date')  
+        outagecount4G_date = pd.merge(outageduration4G_date,outagecount4G_date, on='Date', how='left')  
+        # st.write(outagecount4G_date['Date'].unique())
+
         if outagecount4G_date.empty:
             st.write("    No Outage    ")
         else: 
@@ -555,18 +584,31 @@ def KPIs_of_selected_sector(sector_name):
     st.subheader("Sector Level KPIs")   
             
     # #merge data and time columns
-    selected_sector['Date'] = selected_sector['Date'] + ' ' + selected_sector['Time']
-    selected_sector = selected_sector.drop(['Time'], axis=1)
-    sector_chioces = selected_sector['Sector'].unique()
-    sector = st.radio("Select Sector", sector_chioces, horizontal= True)
+    col1, col2 = st.columns(2)
+    with col1.container(border=True):
+        sector_chioces = selected_sector['Sector'].unique()
+        sector = st.radio("Select Sector", sector_chioces, horizontal= True)
+    with col2.container(border=True):
+        chart_display = st.radio("Chart Type", ['Trend', 'Benchmark'], horizontal= True)
     if sector:
         selected_sector = selected_sector[selected_sector['Sector'] == sector]
     # selected_sector = selected_sector[selected_sector['Sector'] == sector_name]
+
     for kpi in KPIs_of_interest:
         selected_sector[kpi] = selected_sector[kpi].round(2)
         container = st.container(border = True)
-        container.line_chart(data=selected_sector, x='Date', y=kpi, use_container_width=True)
-    return None
+        # container.line_chart(data=selected_sector, x='Date', y=kpi, use_container_width=True)
+        #line chart for each KPI
+        if chart_display == 'Trend':
+            selected_sector['combine'] = selected_sector['Date'] + ' ' + selected_sector['Time']
+            fig = px.line(selected_sector, x='combine', y=kpi, title=kpi).update_layout(xaxis_title='Time', yaxis_title='')
+            # fig.update_xaxes(rangeslider_visible=True)
+            container.plotly_chart(fig, use_container_width=True)
+        else:
+            #date in legend
+            fig = px.line(selected_sector, x='Time', y=kpi, title= kpi, color='Date').update_layout(xaxis_title='Time', yaxis_title='')
+            container.plotly_chart(fig, use_container_width=True)
+      
 # @st.cache_data
 def display_cluster_filter(df):
     cluster_options = [''] + list(df['Cluster'].unique())
@@ -615,7 +657,7 @@ def date_filter():
     return selected_date.strftime('%m/%d/%Y')
 def time_filter():
     # return ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00']
-    last_interval = datetime.now() - timedelta(hours=1, minutes=30)
+    last_interval = datetime.now() - timedelta(hours=1, minutes=36)
     hour = last_interval.hour
     hour = datetime.strptime(str(hour), '%H').time()
     selected_time = st.sidebar.time_input('Select Time', value= hour , step= 3600)
@@ -634,6 +676,9 @@ def main():
 
 
     sitedf = load_site_data()
+    # drop rows with missing values
+    sitedf = sitedf.dropna()
+
     selected_cluster = display_cluster_filter(sitedf)
     selected_kpi = display_KPIs_filter()
     # Date_options = date_filter()
@@ -685,7 +730,7 @@ def main():
         site_df = create_wedges(sitedf)
         # st.write("wedges done")
 
-        Sites_KPIs_df = pd.merge(site_df, mergeddf, on = 'Sector')
+        Sites_KPIs_df = pd.merge(site_df, mergeddf, on = 'Sector', how='left')
         # copy Sites_KPIs_df to gdf (new dataframe)
         # gdf = Sites_KPIs_df.copy()
         gdf = gpd.GeoDataFrame(Sites_KPIs_df, geometry= 'geometry')
@@ -703,17 +748,11 @@ def main():
 
 
         #------------------------------------Layout----------------------------------------------------
-        dash_1 = st.container()
-        with dash_1:
-            # st.markdown("<h1 style='text-align: center; background-color: #ADD8E6;'>Network Visual Analytics</h1>", unsafe_allow_html=True)
-            # st.write("")
-            # st.write("")
-            st.write("")     
+    
             
 
         selected_site = st.sidebar.selectbox('Select Site', site_options, index=0)
-        # show_labels = st.sidebar.checkbox("Show Site Labels", value=False)
-        # show_sites = st.sidebar.checkbox("Show Site Markers", value = False )
+   
 
         filtered_gdf = gdf.copy()
         # st.write("filtered_gdf", filtered_gdf.head())
@@ -734,31 +773,31 @@ def main():
         filtered_gdf[numeric_cols] = filtered_gdf[numeric_cols].round(2)
         # -----------------------------------------Guage Charts------------------------------------------------
      
-        col5, col6 =  st.columns(2)
-        Penetration_5G = filtered_gdf['5G_H_Total Traffic (GB)'].sum()/filtered_gdf['Total PS Traffic GB'].sum()*100
-        Penetration_Volte = filtered_gdf['VoLTE_Traffic (Erlang)'].sum()/filtered_gdf['Total CS Traffic Earlang'].sum()*100      
-    # Display the gauge chart in Streamlit
-        with col5.container(border=True):
-            gauge_chart1 = create_gauge_chart(Penetration_5G, 100, "5G Traffic Penetration", 20)
-            st.plotly_chart(gauge_chart1, use_container_width=True)
-            #add some white space 
-        st.write("")    
-        st.write("")    
+    #     col5, col6 =  st.columns(2)
+    #     Penetration_5G = filtered_gdf['5G_H_Total Traffic (GB)'].sum()/filtered_gdf['Total PS Traffic GB'].sum()*100
+    #     Penetration_Volte = filtered_gdf['VoLTE_Traffic (Erlang)'].sum()/filtered_gdf['Total CS Traffic Earlang'].sum()*100      
+    # # Display the gauge chart in Streamlit
+    #     with col5.container(border=True):
+    #         gauge_chart1 = create_gauge_chart(Penetration_5G, 100, "5G Traffic Penetration", 20)
+    #         st.plotly_chart(gauge_chart1, use_container_width=True)
+    #         #add some white space 
+    #     st.write("")    
+    #     st.write("")    
 
-        # Display the gauge chart in Streamlit
-        with col6.container(border=True):
-            gauge_chart2 = create_gauge_chart(Penetration_Volte, 100, "Volte Traffic Penetration",50)
-            st.plotly_chart(gauge_chart2, use_container_width=True)
+    #     # Display the gauge chart in Streamlit
+    #     with col6.container(border=True):
+    #         gauge_chart2 = create_gauge_chart(Penetration_Volte, 100, "Volte Traffic Penetration",50)
+    #         st.plotly_chart(gauge_chart2, use_container_width=True)
         
-        dash_3 = st.container()
-        with dash_3:           
+        # dash_3 = st.container()
+        # with dash_3:           
 
-                col1, col2, col3, col4 = st.columns(4)
-        #
-                display_kpi(filtered_gdf,col1, 'Total CS Traffic Earlang')
-                display_kpi(filtered_gdf,col2, 'Total PS Traffic GB')
-                display_kpi(filtered_gdf,col3, '4G Users')
-                display_kpi(filtered_gdf, col4, '5G Users')
+        #         col1, col2, col3, col4 = st.columns(4)
+        # #
+        #         display_kpi(filtered_gdf,col1, 'Total CS Traffic Earlang')
+        #         display_kpi(filtered_gdf,col2, 'Total PS Traffic GB')
+        #         display_kpi(filtered_gdf,col3, '4G Users')
+        #         display_kpi(filtered_gdf, col4, '5G Users')
 
 
         # if selected_kpi == '4G Availability':
