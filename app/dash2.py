@@ -184,7 +184,7 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
     else:
         grouped_df5G = pd.DataFrame(columns= df5G.columns)
         #drop the columns Cell Name and Integirty
-        grouped_df5G = grouped_df5G.drop(columns= ['Cell Name', 'Integrity'])
+        grouped_df5G = grouped_df5G.drop(columns= ['Cell Name', 'Integrity', 'gNodeB Name', 'NR Cell ID', 'gNodeB Function Name'])
         grouped_df5G['Sector'] = None
      
 
@@ -222,10 +222,9 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
         }).reset_index()
     else:
         grouped_df3G = pd.DataFrame(columns= df3G.columns)
-        grouped_df3G = grouped_df3G.drop(columns= ['Cell Name', 'Integrity'])
+        grouped_df3G = grouped_df3G.drop(columns= ['Cell Name', 'Integrity', 'RNC', 'Cell ID', 'NodeB Name'])
         grouped_df3G['Sector'] = None
 
-  
     if df2G.empty == False:
         df2G['Sector'] = df2G.apply(lambda row: row['Cell Name'][:5] + '_' + str(int(str(row['Cell CI'])[-1])-1 % 3), axis=1)
         df2G['AM_PS Traffic MB'] = df2G['AM_PS Traffic MB'] /1000
@@ -244,11 +243,11 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
     mergeddf = pd.merge(mergeddf, grouped_df5G, on = ['Date', 'Time', 'Sector'], how='outer')
     # st.write(mergeddf.columns)
     Columnstodrop = ['GBSC','Cell CI', 'Cell Name', 'CellIndex', 'Integrity']
-    mergeddf = mergeddf.drop(columns= Columnstodrop).reset_index(drop=True)
+    mergeddf = mergeddf.drop(columns= Columnstodrop).reset_index(drop=True)  
     # mergeddf['L.UL.Interference.Avg(dBm)'] =  mergeddf['L.UL.Interference.Avg(dBm)'] .fillna(-120)
     # mergeddf['N.UL.NI.Avg(dBm)'] =  mergeddf['N.UL.NI.Avg(dBm)'].fillna(-116)
     # mergeddf['VS.MeanRTWP(dBm)'] =  mergeddf['VS.MeanRTWP(dBm)'].fillna(-112)
-    # mergeddf = mergeddf.fillna(0)
+    mergeddf = mergeddf.fillna(np.nan)
 
     #---------------------------------------KPI Creation -----------------------------------------------------------------------------
     # Adding a new column 'DL User Throughput' based on the given equation
@@ -264,7 +263,7 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
     mergeddf['Total PS Traffic GB'] = np.nan_to_num(mergeddf['Total Traffic Volume (GB)'], nan=0) + \
                                   np.nan_to_num(mergeddf['5G_H_Total Traffic (GB)'], nan=0) + \
                                   np.nan_to_num(mergeddf['PS Traffic GB'], nan=0) + \
-                                  np.nan_to_num(mergeddf['Mab_PS total traffic_GB(GB)'], nan=0)
+                                  np.nan_to_num(mergeddf['Mab_PS total traffic_GB(GB)'], nan=0)    
     mergeddf['4G Users'] = mergeddf['L.Traffic.User.Avg']
     mergeddf['5G Users'] = mergeddf['N.User.NsaDc.PSCell.Avg']
     mergeddf['3G RTWP'] = mergeddf['VS.MeanRTWP(dBm)']
@@ -328,6 +327,7 @@ def create_kpis(df4G, df3G, df2G, df5G):
     mergeddf = pd.merge(mergeddf, grouped_df5G, on = ['Date', 'Time', 'Sector'], how='outer')
     Columnstodrop = ['GBSC','Cell CI', 'Cell Name', 'CellIndex', 'Integrity']
     mergeddf = mergeddf.drop(columns= Columnstodrop).reset_index(drop=True)
+
     # mergeddf['L.UL.Interference.Avg(dBm)'] =  mergeddf['L.UL.Interference.Avg(dBm)'] .fillna(-120)
     # mergeddf['N.UL.NI.Avg(dBm)'] =  mergeddf['N.UL.NI.Avg(dBm)'].fillna(-116)
     # mergeddf['VS.MeanRTWP(dBm)'] =  mergeddf['VS.MeanRTWP(dBm)'].fillna(-112)
@@ -549,6 +549,7 @@ def KPIs_of_selected_sector(sector_name):
 
     selected_sector = create_kpis_sector(df4G, df3G, df2G, df5G) 
     selected_sector = selected_sector[KPIs_of_interest + ['Sector', 'Date', 'Time']]
+    # st.write(selected_sector.head())
     col1,col2,col3 = st.columns(3, gap="medium")    
     with col1.container(border=True):
         cs2gtraffic = df['2G']['K3014:Traffic Volume on TCH(Erl)'].sum()
