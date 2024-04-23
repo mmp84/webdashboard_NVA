@@ -124,10 +124,13 @@ def main():
                 print("5G file found")
                 lic_dir = os.path.join(ftp_data_dir, 'license')
                 destination_path = os.path.join(lic_dir, '5G_license_stats.csv')
-            source_path = os.path.join(csv_folder_path, filename)
-            if os.path.exists(destination_path):
-                        os.remove(destination_path)  # Remove existing file before moving
-            shutil.move(source_path, destination_path)
+            else:
+                destination_path = None
+            if destination_path is not None:
+                source_path = os.path.join(csv_folder_path, filename)
+                if os.path.exists(destination_path):
+                            os.remove(destination_path)  # Remove existing file before moving
+                shutil.move(source_path, destination_path)
 
 
          
