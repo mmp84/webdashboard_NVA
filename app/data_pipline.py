@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import logging
 import sys
-import subprocess
+import shutil
 
 # Set up logging
 script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -39,6 +39,8 @@ def determine_table_name(filename):
         return '4G'
     elif '5G' in filename:
         return '5G'
+    elif 'license' in filename:
+        return 'license'
     else:
         return None  # No matching table
 
@@ -52,6 +54,8 @@ def import_csv_files():
                     if table_name is None:
                         logging.warning(f"Skipping {filename}: No matching table found.")
                         continue
+                  
+
 
                     csv_file_path = os.path.join(csv_folder_path, filename)
 
@@ -108,10 +112,29 @@ def main():
             os.rename(file_path, os.path.join(processed_folder, filename))
 
 
-
     # Run the import process
+    for filename in os.listdir(csv_folder_path):
+        if filename.endswith('.csv'):
+            if '4GRRC' in filename:
+            #move the license file to license folder
+                print("license file found")
+                lic_dir = os.path.join(ftp_data_dir, 'license')   
+                destination_path = os.path.join(lic_dir, 'LTE_license_stats.csv')
+            elif '5GRRC' in filename:
+                print("5G file found")
+                lic_dir = os.path.join(ftp_data_dir, 'license')
+                destination_path = os.path.join(lic_dir, '5G_license_stats.csv')
+            source_path = os.path.join(csv_folder_path, filename)
+            if os.path.exists(destination_path):
+                        os.remove(destination_path)  # Remove existing file before moving
+            shutil.move(source_path, destination_path)
+
+
+         
+                
+
+        
     import_csv_files()
-    query_data('4G')
 if __name__ == '__main__':
     main()
 

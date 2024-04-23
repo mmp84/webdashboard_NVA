@@ -17,8 +17,10 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime, timedelta
 import plotly.express as px
 from plotly.subplots import make_subplots
+st.set_page_config( page_title= "Network Visual Analytics", layout="wide")
+st.sidebar.page_link("dash2.py", label ="Home")
+st.sidebar.page_link("pages/2_License Utilization.py", label = "License Utilization")
 
-st.set_page_config("Network Visual Analytics", layout="wide")
 st_autorefresh(interval=60 * 60 * 1000, key="dataframerefresh")
 APP_TITLE = "Network Visual Analytics"
 sqlite_db_path = '../ftp/data/database.sqlite'

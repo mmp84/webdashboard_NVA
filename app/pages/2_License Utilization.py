@@ -18,7 +18,7 @@ with open('app/style.css') as f:
 script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
 lic_dir = os.path.join(script_dir, '..', '..','ftp', 'data', 'license')
 
-@st.cache_data
+@st.cache_data(ttl =3600*24)
 def read_license_stats():
 
 #read the csv file
@@ -86,6 +86,7 @@ def read_license(lic_file4G, lic_file5G):
                 st.sidebar.write("File uploaded successfully")
                 #read the csv file
                 df_lic4G = pd.read_csv(os.path.join(lic_dir, lic_file4G.name))
+           
         else:
             #read from csv file containing 'SBOM' in the name
             filename = '*LTE_ExportSBOM*.csv'
