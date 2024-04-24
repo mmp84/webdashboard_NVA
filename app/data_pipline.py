@@ -124,6 +124,14 @@ def main():
                 print("5G file found")
                 lic_dir = os.path.join(ftp_data_dir, 'license')
                 destination_path = os.path.join(lic_dir, '5G_license_stats.csv')
+            elif '4G_hourly' in filename:
+                print("4G hourly file found")
+                lic_dir = os.path.join(ftp_data_dir, 'license')
+                destination_path = os.path.join(lic_dir, '4G_hourly.csv')
+            elif '5G_hourly' in filename:
+                print("5G hourly file found")
+                lic_dir = os.path.join(ftp_data_dir, 'license')
+                destination_path = os.path.join(lic_dir, '5G_hourly.csv')
             else:
                 destination_path = None
             if destination_path is not None:
