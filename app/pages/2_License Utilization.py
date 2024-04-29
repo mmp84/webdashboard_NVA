@@ -78,10 +78,14 @@ def read_license_stats():
             df_hourly4G = pd.read_csv(csv_file4G_hourly, skiprows=6)
             # remove last row
             df_hourly4G = df_hourly4G.iloc[:-1]
+            # replace NIL values with NaN
+            df_hourly4G = df_hourly4G.replace('NIL', np.nan)
             df_hourly4G = df_hourly4G.drop(columns='Integrity')
             df_hourly5G = pd.read_csv(csv_file5G_hourly, skiprows=6)
             # remove last row
             df_hourly5G = df_hourly5G.iloc[:-1]
+            # replace NIL values with NaN
+            df_hourly5G = df_hourly5G.replace('NIL', np.nan)
             df_hourly5G = df_hourly5G.drop(columns='Integrity')
 
 

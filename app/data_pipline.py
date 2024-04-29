@@ -5,6 +5,22 @@ import os
 import logging
 import sys
 import shutil
+import mysql.connector
+from sqlalchemy import create_engine
+
+
+# Connect to MySQL database
+engine = create_engine('mysql+mysqlconnector://root:Mobily123@10.27.64.25:3306/dash')
+
+mydb =  mysql.connector.connect(
+    host= "10.27.64.25",
+    port = "3306",
+    user= "root",
+    password= "Mobily123",
+    database= "dash"
+)
+
+mycursor = mydb.cursor()
 
 # Set up logging
 script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -64,7 +80,10 @@ def import_csv_files():
                         df = df.iloc[:-1]  # Drop the last row
                         
                         if validate_data(df):
+                            # replace NIL values with np.nan
+                            df.replace('NIL', pd.NA, inplace=True)
                             df.to_sql(table_name, conn, if_exists='append', index=False)
+                            write_to_mysql(df,table_name)
                             logging.info(f"Appended {filename} to {table_name} table in SQLite database.")
 
                             # Delete the CSV file after successful append
@@ -100,6 +119,16 @@ def query_data(table_name):
             # results.to_csv('D:/FTP/2Gdf.csv')
     except Exception as e:
         logging.error(f"Error querying {table_name} table: {e}")
+def write_to_mysql(df,table_name):
+    try:
+        df.to_sql(table_name, con=engine, if_exists='append', index=False)
+        logging.info(f"Appended {table_name} to MySQL database.")
+    except Exception as e:
+        logging.error(f"Error writing {table_name} to MySQL database: {e}")
+# Main function     
+
+    
+
 def main():
     # unzipping the file
     #print current working directory

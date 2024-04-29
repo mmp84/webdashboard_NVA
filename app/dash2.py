@@ -181,7 +181,8 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
         grouped_df5G = df5G.groupby(['Date', 'Time', 'Sector']).agg({
         '5G_H_Total Traffic (GB)': 'sum',
         'N.User.NsaDc.PSCell.Avg': 'sum',
-        'N.UL.NI.Avg(dBm)': 'max'
+        'N.UL.NI.Avg(dBm)': 'max',
+        'N.Cell.Unavail.Dur.System(s)' : 'max'
     }).reset_index()
     else:
         grouped_df5G = pd.DataFrame(columns= df5G.columns)
@@ -209,7 +210,7 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
             'L.Thrp.Time.UL(ms)': 'sum',
             'VoLTE_Traffic (Erlang)': 'sum',
             'L.UL.Interference.Avg(dBm)': 'max', 
-            'L.Cell.Unavail.Dur.Sys(s)': 'max',
+            'L.Cell.Unavail.Dur.Sys(s)': 'max'
         }).reset_index()
     else:
         grouped_df4G = pd.DataFrame(columns= df4G.columns)
@@ -220,7 +221,8 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
         grouped_df3G = df3G.groupby(['Date', 'Time', 'Sector']).agg({
             'Mab_PS total traffic_GB(GB)': 'sum',
             'Mab_AMR.Erlang.BestCell(Erl)(Erl)': 'sum',
-            'VS.MeanRTWP(dBm)': 'max'
+            'VS.MeanRTWP(dBm)': 'max',
+            'VS.Cell.UnavailTime.Sys(s)' : 'max'
         }).reset_index()
     else:
         grouped_df3G = pd.DataFrame(columns= df3G.columns)
@@ -230,7 +232,7 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
     if df2G.empty == False:
         df2G['Sector'] = df2G.apply(lambda row: row['Cell Name'][:5] + '_' + str(int(str(row['Cell CI'])[-1])-1 % 3), axis=1)
         df2G['AM_PS Traffic MB'] = df2G['AM_PS Traffic MB'] /1000
-        df2G = df2G.rename(columns={'AM_PS Traffic MB': 'PS Traffic GB'})
+        df2G = df2G.rename(columns={'AM_PS Traffic MB': 'PS Traffic GB'})   
     else:
         df2G = pd.DataFrame(columns= df2G.columns)
         #add a column to the dataframe
@@ -272,6 +274,11 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
     mergeddf['LTE UL Interference (dBm)'] = mergeddf['L.UL.Interference.Avg(dBm)']
     mergeddf['5G UL Interference (dBm)'] = mergeddf['N.UL.NI.Avg(dBm)']
     mergeddf['4G Availability'] = (1 - mergeddf['L.Cell.Unavail.Dur.Sys(s)']/3600)*100
+    mergeddf['5G Availability'] = (1 - mergeddf['N.Cell.Unavail.Dur.System(s)']/3600)*100
+    mergeddf['3G Availability'] = (1 - mergeddf['VS.Cell.UnavailTime.Sys(s)']/3600)*100
+    mergeddf['2G Availability'] = (1 - mergeddf['R373:Cell Out-of-Service Duration(s)']/3600)*100
+    mergeddf['2G Interference'] = mergeddf['2G_interference_samples']   
+
     # st.write("Time of creating KPIs", time.time())
     # st.write("Time of creating KPIs:", time.time() - start_time)
     return mergeddf
@@ -310,13 +317,15 @@ def create_kpis(df4G, df3G, df2G, df5G):
     grouped_df3G = df3G.groupby(['Date', 'Time', 'Sector']).agg({
         'Mab_PS total traffic_GB(GB)': 'sum',
         'Mab_AMR.Erlang.BestCell(Erl)(Erl)': 'sum',
-        'VS.MeanRTWP(dBm)': 'max'
+        'VS.MeanRTWP(dBm)': 'max', 
+        'VS.Cell.UnavailTime.Sys(s)' : 'max'
     }).reset_index()
 
     grouped_df5G = df5G.groupby(['Date', 'Time', 'Sector']).agg({
         '5G_H_Total Traffic (GB)': 'sum',
         'N.User.NsaDc.PSCell.Avg': 'sum',
-        'N.UL.NI.Avg(dBm)': 'max'
+        'N.UL.NI.Avg(dBm)': 'max',
+        'N.Cell.Unavail.Dur.System(s)' : 'max'
     }).reset_index()
 
 
@@ -359,6 +368,10 @@ def create_kpis(df4G, df3G, df2G, df5G):
     mergeddf['LTE UL Interference (dBm)'] = mergeddf['L.UL.Interference.Avg(dBm)']
     mergeddf['5G UL Interference (dBm)'] = mergeddf['N.UL.NI.Avg(dBm)']
     mergeddf['4G Availability'] = (1 - mergeddf['L.Cell.Unavail.Dur.Sys(s)']/3600)*100
+    mergeddf['5G Availability'] = (1 - mergeddf['N.Cell.Unavail.Dur.System(s)']/3600)*100
+    mergeddf['3G Availability'] = (1 - mergeddf['VS.Cell.UnavailTime.Sys(s)']/3600)*100 
+    mergeddf['2G Availability'] = (1 - mergeddf['R373:Cell Out-of-Service Duration(s)']/3600)*100
+    mergeddf['2G Interference'] = mergeddf['2G_interference_samples']
     # st.write("Time of creating KPIs", time.time())
     # st.write("Time of creating KPIs:", time.time() - start_time)
     return mergeddf
@@ -382,7 +395,7 @@ def create_map(filtered_gdf, selected_kpi, selected_site):
         
         # map_dict = filtered_gdf.set_index('Sector')[selected_kpi].to_dict()          
 
-        if selected_kpi == '4G Availability':            
+        if selected_kpi == '4G Availability' or selected_kpi == '5G Availability' or selected_kpi == '3G Availability' or selected_kpi == '2G Availability':            
             site_avg_kpi = filtered_gdf.groupby('Site')[selected_kpi].min()
             linear = cm.LinearColormap(['red', 'orange', 'yellow', 'green'], index= [50,75,99.5,100], vmin = 0, vmax=100)
         else:
@@ -437,7 +450,7 @@ def create_map(filtered_gdf, selected_kpi, selected_site):
                         fields=['Sector', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps',
                                 'LTE PRB Utilization', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '4G Users',
                                 '4G Availability', '5G Users', '3G RTWP', 'LTE UL Interference (dBm)',
-                                '5G UL Interference (dBm)'], labels=True),
+                                '5G UL Interference (dBm)', '2G Availability', '3G Availability', '5G Availability', '2G Interference'], labels=True),
                         #   onEachFeature=whenClicked
                         
                     ).add_to(fg1)
@@ -445,12 +458,12 @@ def create_map(filtered_gdf, selected_kpi, selected_site):
         linear.add_to(m)
 
         # for every lat and long in filtered_gdf take max of selected_kpi
-        if selected_kpi == '4G Availability':
+        if selected_kpi == '4G Availability' or selected_kpi == '5G Availability' or selected_kpi == '3G Availability' or selected_kpi == '2G Availability':
             df = filtered_gdf.groupby(['lat', 'long'])[selected_kpi].min().reset_index().dropna()
         else:
             df = filtered_gdf.groupby(['lat', 'long'])[selected_kpi].max().reset_index().dropna()
 
-        if selected_kpi == '4G Availability':
+        if selected_kpi == '4G Availability' or selected_kpi == '5G Availability' or selected_kpi == '3G Availability' or selected_kpi == '2G Availability':
             df[selected_kpi] = df[selected_kpi].apply(lambda x: abs(x-100))       
         if selected_kpi == 'LTE UL Interference (dBm)':
             df[selected_kpi] = df[selected_kpi].apply(lambda x: 0 if x <= -105 else x + 105)
@@ -540,7 +553,7 @@ def create_gauge_chart(value, max_value, title, reference):
 def get_time_options_for_date(date,gdf):
     return sorted(gdf[gdf['Date'] == date]['Time'].unique())
 def KPIs_of_selected_sector(sector_name):
-    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']  # Replace with actual KPI column names
+    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability', '2G Availability' , '3G Availability', '5G Availability', '2G Interference']  # Replace with actual KPI column names
     df = load_and_process_data_sector(sector_name)
     df4G = df['4G']
     df3G = df['3G']
@@ -619,7 +632,8 @@ def display_cluster_filter(df):
     return st.sidebar.selectbox('Select Cluster', cluster_options, index=cluster_index)
 # @st.cache_data    
 def display_KPIs_filter():
-    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']  # Replace with actual KPI column names
+    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability' , 
+                        '2G Availability', '3G Availability', '5G Availability', '2G Interference']  # Replace with actual KPI column names
     return st.sidebar.selectbox('Select KPI', KPIs_of_interest)
 @st.cache_data(ttl=3600)
 def load_and_process_data_short(selected_date, selected_time):
