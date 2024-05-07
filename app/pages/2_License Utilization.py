@@ -15,6 +15,7 @@ import plotly.graph_objects as go
 st.set_page_config("License Utilization", layout="wide")
 st.sidebar.page_link("dash2.py", label ="Home")
 st.sidebar.page_link("pages/2_License Utilization.py", label = "License Utilization")
+st.sidebar.page_link("pages/1_Daily Dashboard.py", label = "Daily Dashboard")
 with open('app/style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))

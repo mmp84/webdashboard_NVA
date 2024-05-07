@@ -41,6 +41,16 @@ def add_columns():
                     logging.error(f"Error adding column {new_column} to table '{table_name}': {e}")
                     continue
     print("Columns added successfully")
+def rename_columns():
+    with sqlite3.connect(sqlite_db_path) as conn:
+        try:
+            conn.execute('ALTER TABLE "2G" RENAME COLUMN "2G_interference_samples" TO "2G_interference_samples(%)"')
+            logging.info("Column renamed successfully")
+        except sqlite3.OperationalError as e:
+            logging.warning(f"Error renaming column: {e}")
+
+    
+    
 def get_table_info():
     with sqlite3.connect(sqlite_db_path) as conn:
         # Get the table names
@@ -63,8 +73,9 @@ def write_to_mysql():
 
 
 def main():
-    add_columns()
-    get_table_info()
+    # add_columns()
+    # get_table_info()
+    rename_columns()
 
 # What is the output of the code above?
 if __name__ == "__main__":

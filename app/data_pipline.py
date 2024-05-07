@@ -47,14 +47,27 @@ def unzip_file(file_path):
 
 # Function to determine the appropriate table based on the filename
 def determine_table_name(filename):
-    if '2G' in filename:
+    if '2G_geo' in filename:
         return '2G'
-    elif '3G' in filename:
+    elif '3G_geo' in filename:
         return '3G'
-    elif '4G' in filename:
+    elif '4G_geo' in filename:
         return '4G'
-    elif '5G' in filename:
+    elif '5G_geo' in filename:
         return '5G'
+    elif '2G_daily_kpi' in filename:
+        return '2g_kpi_daily'
+    elif 'UMTS_daily_kpi' in filename:
+        return '3g_kpi_daily'
+    elif '4G_daily_kpi' in filename:
+        return '4g_kpi_daily'
+    elif 'NR_daily_kpi' in filename:
+        return '5g_kpi_daily'
+    elif 'VoLTE_daily_kpi' in filename:
+        return 'volte_kpi_daily'
+    elif 'NB-IOT_daily_kpi' in filename:
+        return 'nbiot_kpi_daily'
+
     elif 'license' in filename:
         return 'license'
     else:
@@ -141,7 +154,7 @@ def main():
             os.rename(file_path, os.path.join(processed_folder, filename))
 
 
-    # Run the import process
+    # License Module 
     for filename in os.listdir(csv_folder_path):
         if filename.endswith('.csv'):
             if '4GRRC' in filename:

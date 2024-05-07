@@ -20,6 +20,7 @@ from plotly.subplots import make_subplots
 st.set_page_config( page_title= "Network Visual Analytics", layout="wide")
 st.sidebar.page_link("dash2.py", label ="Home")
 st.sidebar.page_link("pages/2_License Utilization.py", label = "License Utilization")
+st.sidebar.page_link("pages/1_Daily Dashboard.py", label = "Daily Dashboard")
 
 st_autorefresh(interval=60 * 60 * 1000, key="dataframerefresh")
 APP_TITLE = "Network Visual Analytics"
@@ -277,7 +278,7 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
     mergeddf['5G Availability'] = (1 - mergeddf['N.Cell.Unavail.Dur.System(s)']/3600)*100
     mergeddf['3G Availability'] = (1 - mergeddf['VS.Cell.UnavailTime.Sys(s)']/3600)*100
     mergeddf['2G Availability'] = (1 - mergeddf['R373:Cell Out-of-Service Duration(s)']/3600)*100
-    mergeddf['2G Interference'] = mergeddf['2G_interference_samples']   
+    mergeddf['2G Interference'] = mergeddf['2G_interference_samples(%)']   
 
     # st.write("Time of creating KPIs", time.time())
     # st.write("Time of creating KPIs:", time.time() - start_time)
@@ -371,7 +372,7 @@ def create_kpis(df4G, df3G, df2G, df5G):
     mergeddf['5G Availability'] = (1 - mergeddf['N.Cell.Unavail.Dur.System(s)']/3600)*100
     mergeddf['3G Availability'] = (1 - mergeddf['VS.Cell.UnavailTime.Sys(s)']/3600)*100 
     mergeddf['2G Availability'] = (1 - mergeddf['R373:Cell Out-of-Service Duration(s)']/3600)*100
-    mergeddf['2G Interference'] = mergeddf['2G_interference_samples']
+    mergeddf['2G Interference'] = mergeddf['2G_interference_samples(%)']
     # st.write("Time of creating KPIs", time.time())
     # st.write("Time of creating KPIs:", time.time() - start_time)
     return mergeddf
@@ -553,7 +554,11 @@ def create_gauge_chart(value, max_value, title, reference):
 def get_time_options_for_date(date,gdf):
     return sorted(gdf[gdf['Date'] == date]['Time'].unique())
 def KPIs_of_selected_sector(sector_name):
-    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability', '2G Availability' , '3G Availability', '5G Availability', '2G Interference']  # Replace with actual KPI column names
+    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability', '2G Availability' , '3G Availability', '5G Availability', '2G Interference'] 
+   
+    
+    
+     # Replace with actual KPI column names
     df = load_and_process_data_sector(sector_name)
     df4G = df['4G']
     df3G = df['3G']
@@ -632,8 +637,9 @@ def display_cluster_filter(df):
     return st.sidebar.selectbox('Select Cluster', cluster_options, index=cluster_index)
 # @st.cache_data    
 def display_KPIs_filter():
-    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability' , 
-                        '2G Availability', '3G Availability', '5G Availability', '2G Interference']  # Replace with actual KPI column names
+    # KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability' , 
+                        # '2G Availability', '3G Availability', '5G Availability', '2G Interference']  # Replace with actual KPI column names
+    KPIs_of_interest = ['4G Availability', '4G Users', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps', 'LTE PRB Utilization', 'LTE UL Interference (dBm)', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '5G Availability', '5G Users', '5G UL Interference (dBm)', '3G Availability', '3G RTWP', '2G Availability', '2G Interference']
     return st.sidebar.selectbox('Select KPI', KPIs_of_interest)
 @st.cache_data(ttl=3600)
 def load_and_process_data_short(selected_date, selected_time):
