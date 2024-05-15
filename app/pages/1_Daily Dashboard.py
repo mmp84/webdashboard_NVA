@@ -18,6 +18,7 @@ st.set_page_config("Daily Dashboard", layout="wide")
 st.sidebar.page_link("dash2.py", label ="Home")
 st.sidebar.page_link("pages/2_License Utilization.py", label = "License Utilization")
 st.sidebar.page_link("pages/1_Daily Dashboard.py", label = "Daily Dashboard")
+st.sidebar.page_link("pages/3_Hourly Dashboard.py", label = "Hourly Dashboard")
 
 with open('app/style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
@@ -111,7 +112,7 @@ def cluster_options(df2g, df3g, df4g, dfvolte, df5g, dfiot):
 def plot_charts_in_grid(df,bm_date = None):
     figs = []
     ncols = len(df.columns[2:])
-    nrows = (ncols + 1) // 2  # Calculate number of rows required
+    nrows = (ncols + 1) // 3  # Calculate number of rows required
     cluster = df.iloc[:,0]
     if bm_date is None:
         bm_date_str = None
@@ -119,15 +120,27 @@ def plot_charts_in_grid(df,bm_date = None):
         bm_date_str = bm_date.strftime('%Y-%m-%d')
 
     for i in range(nrows):
-        columns = st.columns(2)  # Create two columns for each row
-        for j in range(2):
-            idx = i * 2 + j
+        columns = st.columns(3)  # Create two columns for each row
+        for j in range(3):
+            idx = i * 3 + j
             if idx < ncols:
                 col = df.columns[2:][idx]
-                fig = px.line(df, x=df.index, y=col, title=f'{col}', color = cluster , template= 'presentation').update_layout(xaxis_title = "Date", yaxis_title = "", legend = dict(title = 'Cluster'))
+                fig = px.line(df, x=df.index, y=col, title=f'{col}', color = cluster , template= 'presentation', height= 350, line_shape = "spline").update_layout(xaxis_title = "", yaxis_title = "", title= { 'text':f'{col}','xanchor':'center', 'x': 0.5}, legend = dict(
+                    title = '',
+                    yanchor = 'bottom',
+                    y = -0.55,
+                    xanchor = 'center',
+                    x = 0.5, 
+                    orientation = 'h', 
+                    ))
+                fig.update_yaxes(tickfont_family="Arial Black")
+                fig.update_xaxes(tickfont_family="Arial Black")
+                
                 if bm_date_str:
                     fig.add_vline(x=bm_date_str, line_dash="dash", line_color="red", line_width=1)
-                with columns[j].container(height= 500, border= True):
+            
+                
+                with columns[j].container(height= 375, border= True):
                     st.plotly_chart(fig, use_container_width=True)
                     figs.append(fig)
 
@@ -148,7 +161,7 @@ def tech_container():
             sac.ButtonsItem(label="DIY", color = 'indigo')     
         ], key = "tech", align = "start", size= "md", use_container_width=True)
     return tech
-@st.cache_data  
+@st.cache_data(ttl=3600*12)
 def fetch_data(start_date, end_date , tech = "None"):
     # connect to MySQL database
     mydb =  mysql.connector.connect(
@@ -196,39 +209,94 @@ def create_download_link(val, filename):
     b64 = base64.b64encode(val)  # val looks like b'...'
 
     return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="{filename}.pdf">Download file</a>'
-def create_pdf(figs, tech):
-    page_width = 210-10  # Width of the page in millimeters
-    page_height = 297-10  # Height of the page in millimeters
-    percentage_width = 50  # Desired width as a percentage
-    percentage_height = 50  # Desired height as a percentage
+# def create_pdf(figs, tech):
+#     page_width = 210-10  # Width of the page in millimeters
+#     page_height = 297-10  # Height of the page in millimeters
+#     percentage_width = 50  # Desired width as a percentage
+#     percentage_height = 50  # Desired height as a percentage
 
-    # Convert percentages to millimeters
-    w = 190 
-    h = (percentage_height / 100) * page_height
-    # if export_as_pdf:
+#     # Convert percentages to millimeters
+#     w = 190 
+#     h = (percentage_height / 100) * page_height
+#     # if export_as_pdf:
+#     pdf = FPDF()
+#     num_figs = len(figs)
+#     #page layout horizontal
+    
+#         # Add title on the first page
+#     pdf.add_page(orientation='L')
+#     pdf.set_font("Arial", size=16)
+#     txt = "Daily Performance Report {}".format(tech)
+#     x_center = (pdf.w / 2)-100
+#     y_center = pdf.h / 2
+#     pdf.set_xy(x_center, y_center)
+#     pdf.cell(200, 10, txt= txt, ln=True, align="C")
+#     pdf.ln(10)  # Add a new line
+#     for i in range(0, num_figs, 3):
+#         pdf.add_page(orientation='L')
+#         with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile1:
+#             figs[i].write_image(tmpfile1.name)
+#             pdf.image(tmpfile1.name, x = 5, y = 10, w = 100, type='png' )
+#         if i + 1 < num_figs:
+#             with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile2:
+#                 figs[i+1].write_image(tmpfile2.name)
+#                 pdf.image(tmpfile2.name, x =105, y = 10, w = 100, type='png' )
+#         if i + 2 < num_figs:
+#             with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile3:
+#                 figs[i+2].write_image(tmpfile3.name)
+#                 pdf.image(tmpfile3.name, x= 205, y = 10, w = 100,  type='png' )
+#         if i + 3 < num_figs:
+#             pdf.add_page(orientation='L')
+#             with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile4:
+#                 figs[i+3].write_image(tmpfile4.name)
+#                 pdf.image(tmpfile4.name, x = 5, y = 10, w = 100,  type='png' )
+#         if i + 4 < num_figs:
+#             with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile5:
+#                 figs[i+4].write_image(tmpfile5.name)
+#                 pdf.image(tmpfile5.name, x =105, y = 10, w = 100,  type='png' )
+#         if i + 5 < num_figs:
+#             with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile6:
+#                 figs[i+5].write_image(tmpfile6.name)
+#                 pdf.image(tmpfile6.name, x= 205, y = 10, w = 100,  type='png' )
+#     return pdf
+
+
+def create_pdf(figs, tech):
+    page_width = 210 - 2  # Width of the page in millimeters
+    page_height = 297 - 5  # Height of the page in millimeters
+    cell_width = 92
+    cell_height = 65
+    rows = 3
+    cols = 3
     pdf = FPDF()
     num_figs = len(figs)
-        # Add title on the first page
-    pdf.add_page()
+
+    # Add title on the first page
+    pdf.add_page(orientation='L')
     pdf.set_font("Arial", size=16)
     txt = "Daily Performance Report {}".format(tech)
-
-
-    x_center = (pdf.w / 2)-100
-    y_center = pdf.h / 2
+    x_center = (page_width / 2) - 50
+    y_center = page_height / 3
     pdf.set_xy(x_center, y_center)
-    pdf.cell(200, 10, txt= txt, ln=True, align="C")
+    pdf.cell(200, 10, txt=txt, ln=True, align="C")
     pdf.ln(10)  # Add a new line
-    for i in range(0, num_figs, 2):
-        pdf.add_page()
-        with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile1:
-            figs[i].write_image(tmpfile1.name)
-            pdf.image(tmpfile1.name, x=10, y=0, w=w, h=h)
-        if i + 1 < num_figs:
-            with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile2:
-                figs[i+1].write_image(tmpfile2.name)
-                pdf.image(tmpfile2.name, x=10, y=h+10, w=w, h=h   )
+
+    for i in range(0, num_figs, rows * cols):
+        pdf.add_page(orientation='L')
+        for row in range(rows):
+            for col in range(cols):
+                index = i + row * cols + col
+                if index < num_figs:
+                    with NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
+                        figs[index].write_image(tmpfile.name)
+                        x_pos = 5 + col * (cell_width + 5)
+                        y_pos = 5 + row * (cell_height + 5)
+                        pdf.image(tmpfile.name, x=x_pos, y=y_pos, w = cell_width, type='png')
+
     return pdf
+
+
+
 
 
 def main():
@@ -344,7 +412,7 @@ def main():
         # set index to Date
         filtered5g = filtered5g.set_index('Date')
         figs = plot_charts_in_grid(filtered5g,bm_date)
-        output
+        output = df5g
     # with IOT:
     if tech == "IOT":
         l,r = st.columns(2) 
@@ -373,11 +441,14 @@ def main():
         elif select_df == "IOT":
             df = dfiot
         
+        output = df
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y')
+ 
         pyg_app =  StreamlitRenderer(df)
         pyg_app.explorer()
 
-
-    # st download button to download the selected data
+# st download button to download the selected data
     st.sidebar.download_button(
             label="Download Raw Data",
             data= output.to_csv(index=False).encode('utf-8'),
@@ -389,15 +460,20 @@ def main():
         # html = create_download_link(pdf.output(dest='S').encode('latin1'), 'report')
         # st.markdown(html, unsafe_allow_html=True)
         # st.download_button to download pdf
+    with st.sidebar.form(key="export_pdf", border = False):
+        submit = st.form_submit_button("Export Charts to PDF")
+        if submit:
+            placeholder = st.sidebar.empty()
+            with placeholder, st.spinner("Exporting to PDF..."):
+                data = create_pdf(figs, tech).output(dest='S').encode('latin1')
+                st.sidebar.success("PDF Exported Successfully!")
+                st.sidebar.download_button(    
 
-    st.sidebar.download_button(
-    
-
-    label="Export Charts to PDF", 
-    data= create_pdf(figs, tech).output(dest='S').encode('latin1'),
-    file_name='report.pdf',
-    mime='application/pdf'
-)
+                label="Download PDF", 
+                data= data,
+                file_name='report.pdf',
+                mime='application/pdf'
+                    )
 
 
      

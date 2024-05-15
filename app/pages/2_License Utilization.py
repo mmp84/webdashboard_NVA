@@ -16,6 +16,7 @@ st.set_page_config("License Utilization", layout="wide")
 st.sidebar.page_link("dash2.py", label ="Home")
 st.sidebar.page_link("pages/2_License Utilization.py", label = "License Utilization")
 st.sidebar.page_link("pages/1_Daily Dashboard.py", label = "Daily Dashboard")
+st.sidebar.page_link("pages/3_Hourly Dashboard.py", label = "Hourly Dashboard")
 with open('app/style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -249,12 +250,13 @@ def main():
 
 
 # Display styled DataFrame
-            left, right = st.columns([3,2])
-            left.write("LTE License Utilization")
-            left.dataframe(styled_df, hide_index=True)
-            right.write("Sites with Failures")
+            with st.expander("LTE License Utilization", expanded=True):
+                st.dataframe(styled_df, hide_index=True)
+            with st.expander("Sites with Failures"):
 
-            right.dataframe(sites_with_failures4G, hide_index=True)
+                st.dataframe(sites_with_failures4G, hide_index=True)
+            st.html("""<h2 style='text-align: left; color: #B09EB0;'>Drill Down</h2>""")
+
             row = st.columns(2)
             col21, col22 = row[0].columns(2)
             site_options = df_combined['eNodeB Name'].unique().tolist()
@@ -263,13 +265,15 @@ def main():
             # get license of selected site
             df_filter_lic = df_lic4G[df_lic4G['eNodeB Name'] == selected_site]
             filter_df = df_combined[df_combined['eNodeB Name'] == selected_site]
+            if df_filter_lic.empty:
+                st.write("No license data available for selected site")
+                return
             lic_fdd_selected_site = df_filter_lic['Total RRC User License FDD'].values[0]
             lic_tdd_selected_site = df_filter_lic['Total RRC User License TDD'].values[0]
             df_filter_hourly_4g = df_hourly4G[df_hourly4G['eNodeB Name'] == selected_site]
             df_filter_hourly_4g['FDD Utilization'] = df_filter_hourly_4g['L.Traffic.eNodeB.FDD.User.Max'].astype('float') / lic_fdd_selected_site * 100
             df_filter_hourly_4g['TDD Utilization'] = df_filter_hourly_4g['L.Traffic.eNodeB.TDD.User.Max'].astype('float') / lic_tdd_selected_site * 100
             df_filter_hourly_4g['Date'] = pd.to_datetime(df_filter_hourly_4g['Date'] + ' ' + df_filter_hourly_4g['Time'])
-
             with col22.container(border=True):
 
                 tech = st.radio("Select Technology", ('FDD', 'TDD'), horizontal=True)
@@ -364,11 +368,10 @@ def main():
           
 
 
-
           
             st.download_button(
             label="Download Data",
-            data= df.to_csv().encode('utf-8'),
+            data= df.to_csv(index = False).encode('utf-8'),
             file_name='LTE license_utilization.csv',
             mime='text/csv'
         )   
@@ -392,12 +395,11 @@ def main():
                                    'N.User.gNodeB.RRCConn.Max': '{:.0f}'})
 
             
-                              
-            left, right = st.columns([3,2])
-            left.write("5G License Utilization")
-            left.dataframe(styled_df5G, hide_index=True)
-            right.write("Sites with Failures")
-            right.dataframe(sites_with_failures5G, hide_index=True)
+            with st.expander("5G License Utilization", expanded=True):
+                st.dataframe(styled_df5G, hide_index=True)   
+            with st.expander("Sites with Failures"):
+                st.dataframe(sites_with_failures5G, hide_index=True)    
+            st.html("""<h2 style='text-align: left; color: #B09EB0;'>Drill Down</h2>""")            
             site_options5G = df_combined5G['gNodeB Name'].unique().tolist()
 
             selected_site5G = st.selectbox('Select Site', site_options5G)
@@ -453,7 +455,7 @@ def main():
                 # st download button
             st.download_button(
                 label="Download Data",
-                data=df5G.to_csv().encode('utf-8'),
+                data=df5G.to_csv(index=False).encode('utf-8'),
                 file_name='NR license_utilization.csv',
                 mime='text/csv'
             )   

@@ -21,6 +21,7 @@ st.set_page_config( page_title= "Network Visual Analytics", layout="wide")
 st.sidebar.page_link("dash2.py", label ="Home")
 st.sidebar.page_link("pages/2_License Utilization.py", label = "License Utilization")
 st.sidebar.page_link("pages/1_Daily Dashboard.py", label = "Daily Dashboard")
+st.sidebar.page_link("pages/3_Hourly Dashboard.py", label = "Hourly Dashboard")
 
 st_autorefresh(interval=60 * 60 * 1000, key="dataframerefresh")
 APP_TITLE = "Network Visual Analytics"
@@ -183,7 +184,13 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
         '5G_H_Total Traffic (GB)': 'sum',
         'N.User.NsaDc.PSCell.Avg': 'sum',
         'N.UL.NI.Avg(dBm)': 'max',
-        'N.Cell.Unavail.Dur.System(s)' : 'max'
+        'N.Cell.Unavail.Dur.System(s)' : 'max', 
+        'N.ThpVol.DL(kbit)' : 'sum',
+        'N.ThpVol.DL.LastSlot(kbit)' : 'sum',
+        'N.ThpTime.DL.RmvLastSlot(microsecond)' : 'sum',
+        'N.ThpVol.UL(kbit)' : 'sum',
+        'N.ThpVol.UE.UL.SmallPkt(kbit)' : 'sum',
+        'N.ThpTime.UE.UL.RmvSmallPkt(microsecond)' : 'sum'
     }).reset_index()
     else:
         grouped_df5G = pd.DataFrame(columns= df5G.columns)
@@ -279,6 +286,9 @@ def create_kpis_sector(df4G, df3G, df2G, df5G):
     mergeddf['3G Availability'] = (1 - mergeddf['VS.Cell.UnavailTime.Sys(s)']/3600)*100
     mergeddf['2G Availability'] = (1 - mergeddf['R373:Cell Out-of-Service Duration(s)']/3600)*100
     mergeddf['2G Interference'] = mergeddf['2G_interference_samples(%)']   
+    mergeddf['NR DL User Throughput Mbps'] = ((mergeddf['N.ThpVol.DL(kbit)'] - mergeddf['N.ThpVol.DL.LastSlot(kbit)']) / mergeddf['N.ThpTime.DL.RmvLastSlot(microsecond)']) * 1000
+    mergeddf['NR UL User Throughput Mbps'] = ((mergeddf['N.ThpVol.UL(kbit)'] - mergeddf['N.ThpVol.UE.UL.SmallPkt(kbit)'])/ mergeddf['N.ThpTime.UE.UL.RmvSmallPkt(microsecond)']) *  1000
+
 
     # st.write("Time of creating KPIs", time.time())
     # st.write("Time of creating KPIs:", time.time() - start_time)
@@ -326,7 +336,13 @@ def create_kpis(df4G, df3G, df2G, df5G):
         '5G_H_Total Traffic (GB)': 'sum',
         'N.User.NsaDc.PSCell.Avg': 'sum',
         'N.UL.NI.Avg(dBm)': 'max',
-        'N.Cell.Unavail.Dur.System(s)' : 'max'
+        'N.Cell.Unavail.Dur.System(s)' : 'max',
+        'N.ThpVol.DL(kbit)' : 'sum',
+        'N.ThpVol.DL.LastSlot(kbit)' : 'sum',
+        'N.ThpTime.DL.RmvLastSlot(microsecond)' : 'sum',
+        'N.ThpVol.UL(kbit)' : 'sum',
+        'N.ThpVol.UE.UL.SmallPkt(kbit)' : 'sum',
+        'N.ThpTime.UE.UL.RmvSmallPkt(microsecond)' : 'sum'
     }).reset_index()
 
 
@@ -373,6 +389,8 @@ def create_kpis(df4G, df3G, df2G, df5G):
     mergeddf['3G Availability'] = (1 - mergeddf['VS.Cell.UnavailTime.Sys(s)']/3600)*100 
     mergeddf['2G Availability'] = (1 - mergeddf['R373:Cell Out-of-Service Duration(s)']/3600)*100
     mergeddf['2G Interference'] = mergeddf['2G_interference_samples(%)']
+    mergeddf['NR DL User Throughput Mbps'] = ((mergeddf['N.ThpVol.DL(kbit)'] - mergeddf['N.ThpVol.DL.LastSlot(kbit)']) / mergeddf['N.ThpTime.DL.RmvLastSlot(microsecond)']) * 1000
+    mergeddf['NR UL User Throughput Mbps'] = ((mergeddf['N.ThpVol.UL(kbit)'] - mergeddf['N.ThpVol.UE.UL.SmallPkt(kbit)'])/ mergeddf['N.ThpTime.UE.UL.RmvSmallPkt(microsecond)']) *  1000
     # st.write("Time of creating KPIs", time.time())
     # st.write("Time of creating KPIs:", time.time() - start_time)
     return mergeddf
@@ -385,7 +403,19 @@ def create_map(filtered_gdf, selected_kpi, selected_site):
             location = filtered_gdf[filtered_gdf['Site'] == selected_site][['lat','long']].values[0]
         else:
             location = [filtered_gdf['lat'].mean(), filtered_gdf['long'].mean()]
-        m = folium.Map(location= location, zoom_start=15, prefer_canvas=True, tiles='cartodbpositron')
+        # create attribute for the map, open street, cartodbpositron, stamenterrain
+        
+        m = folium.Map(location= location, zoom_start=15, prefer_canvas=True, tiles= 'cartodbpositron')   
+        # add open street map as an additional layer
+        openstreetmap = folium.TileLayer(
+            tiles = 'openstreetmap',
+            control = True,
+            show = False,
+            attr= 'openstreetmap')
+        openstreetmap.add_to(m) 
+  
+        #enable layer control
+
         # Adding markers
         enodebdf = filtered_gdf.drop_duplicates('Site')
         enodebdf = enodebdf[['Site', 'lat', 'long']].reset_index()
@@ -448,10 +478,7 @@ def create_map(filtered_gdf, selected_kpi, selected_site):
                     },
 
                     tooltip=folium.features.GeoJsonTooltip(
-                        fields=['Sector', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps',
-                                'LTE PRB Utilization', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '4G Users',
-                                '4G Availability', '5G Users', '3G RTWP', 'LTE UL Interference (dBm)',
-                                '5G UL Interference (dBm)', '2G Availability', '3G Availability', '5G Availability', '2G Interference'], labels=True),
+                        fields=['Sector', '4G Availability', '4G Users', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps', 'LTE PRB Utilization', 'LTE UL Interference (dBm)', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '5G Availability', '5G Users', '5G UL Interference (dBm)','NR DL User Throughput Mbps', 'NR UL User Throughput Mbps', '3G Availability', '3G RTWP', '2G Availability', '2G Interference'], labels=True),
                         #   onEachFeature=whenClicked
                         
                     ).add_to(fg1)
@@ -554,7 +581,7 @@ def create_gauge_chart(value, max_value, title, reference):
 def get_time_options_for_date(date,gdf):
     return sorted(gdf[gdf['Date'] == date]['Time'].unique())
 def KPIs_of_selected_sector(sector_name):
-    KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability', '2G Availability' , '3G Availability', '5G Availability', '2G Interference'] 
+    KPIs_of_interest = ['4G Availability', '4G Users', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps', 'LTE PRB Utilization', 'LTE UL Interference (dBm)', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '5G Availability', '5G Users', '5G UL Interference (dBm)','NR DL User Throughput Mbps', 'NR UL User Throughput Mbps', '3G Availability', '3G RTWP', '2G Availability', '2G Interference'] 
    
     
     
@@ -605,31 +632,102 @@ def KPIs_of_selected_sector(sector_name):
     st.subheader("Sector Level KPIs")   
             
     # #merge data and time columns
-    col1, col2 = st.columns(2)
-    with col1.container(border=True):
-        sector_chioces = selected_sector['Sector'].unique()
-        sector = st.radio("Select Sector", sector_chioces, horizontal= True)
+    # col1, col2 = st.columns(2)
+    # with col1.container(border=True):
+    #     sector_chioces = selected_sector['Sector'].unique()
+    #     sector = st.radio("Select Sector", sector_chioces, horizontal= True)
+    # with col2.container(border=True):
+    #     chart_display = st.radio("Chart Type", ['Trend', 'Benchmark'], horizontal= True)
+    # if sector:
+    #     selected_sector = selected_sector[selected_sector['Sector'] == sector]
+    # selected_sector = selected_sector[selected_sector['Sector'] == sector_name]
+    plot_charts_in_grid(selected_sector, KPIs_of_interest)
+    # for kpi in KPIs_of_interest:
+    #     selected_sector[kpi] = selected_sector[kpi].round(2)
+    #     container = st.container(border = True)
+    #     # container.line_chart(data=selected_sector, x='Date', y=kpi, use_container_width=True)
+    #     #line chart for each KPI
+    #     if chart_display == 'Trend':
+    #         selected_sector['combine'] = selected_sector['Date'] + ' ' + selected_sector['Time']
+    #         fig = px.line(selected_sector, x='combine', y=kpi, title=kpi).update_layout(xaxis_title='Time', yaxis_title='')
+    #         # fig.update_xaxes(rangeslider_visible=True)
+    #         container.plotly_chart(fig, use_container_width=True)
+    #     else:
+    #         #date in legend
+    #         fig = px.line(selected_sector, x='Time', y=kpi, title= kpi, color='Date').update_layout(xaxis_title='Time', yaxis_title='')
+    #         container.plotly_chart(fig, use_container_width=True)
+@st.experimental_fragment
+def plot_charts_in_grid(df, KPIs_of_interest):
+    figs = []
+
+    col1, col2 = st.columns(2)  
+
     with col2.container(border=True):
         chart_display = st.radio("Chart Type", ['Trend', 'Benchmark'], horizontal= True)
-    if sector:
-        selected_sector = selected_sector[selected_sector['Sector'] == sector]
-    # selected_sector = selected_sector[selected_sector['Sector'] == sector_name]
-
-    for kpi in KPIs_of_interest:
-        selected_sector[kpi] = selected_sector[kpi].round(2)
-        container = st.container(border = True)
-        # container.line_chart(data=selected_sector, x='Date', y=kpi, use_container_width=True)
-        #line chart for each KPI
-        if chart_display == 'Trend':
-            selected_sector['combine'] = selected_sector['Date'] + ' ' + selected_sector['Time']
-            fig = px.line(selected_sector, x='combine', y=kpi, title=kpi).update_layout(xaxis_title='Time', yaxis_title='')
-            # fig.update_xaxes(rangeslider_visible=True)
-            container.plotly_chart(fig, use_container_width=True)
+    with col1.container(border=True):
+        sector_choices = df['Sector'].unique()
+        if chart_display == 'Benchmark':
+            sector = st.radio("Select Sector", sector_choices, horizontal= True)
+            df = df[df['Sector'] == sector]
         else:
-            #date in legend
-            fig = px.line(selected_sector, x='Time', y=kpi, title= kpi, color='Date').update_layout(xaxis_title='Time', yaxis_title='')
-            container.plotly_chart(fig, use_container_width=True)
-      
+            sector = st.multiselect("Select Sector", sector_choices, default= sector_choices)
+            df = df[df['Sector'].isin(sector)]
+
+    # plot charts in grid of 2 columns
+    figs = []
+    ncols = len(KPIs_of_interest)
+    nrows = (ncols + 1) // 3  # Calculate number of rows required
+    # if bm_date is None:
+    #     bm_date_str = None
+    # else:
+    #     bm_date_str = bm_date.strftime('%Y-%m-%d')
+    if chart_display == 'Trend':
+        df['combine'] = df['Date'] + ' ' + df['Time']   
+
+        for i in range(nrows):
+            columns = st.columns(3)  # Create two columns for each row
+            for j in range(3):
+                idx = i * 3 + j
+                if idx < ncols:
+                    col = df.columns[0:][idx]                
+                    fig = px.line(df, x= df['combine'], y=col, color= 'Sector' , template= 'presentation', height= 350).update_layout(xaxis_title = "", yaxis_title = "", title= { 'text':f'{col}','xanchor':'center', 'x': 0.5, 'yanchor': 'auto'}, legend = dict(
+                        title = '',
+                        yanchor = 'top',
+                        y = 1.2,
+                        xanchor = 'center',
+                        x = 0.5, 
+                        orientation = 'h',                         
+                         ))
+                    fig.update_yaxes(tickfont_family = 'Arial Black')                  
+                    
+                    with columns[j].container(height= 375, border= True):
+                        st.plotly_chart(fig, use_container_width=True)
+                        figs.append(fig)
+    else:
+        for i in range(nrows):
+            columns = st.columns(3)
+            for j in range(3):
+                idx = i * 3 + j
+                if idx < ncols:
+                    col = df.columns[0:][idx]
+                    fig = px.line(df, x= 'Time', y=col, color= 'Date', template= 'presentation', height= 350, line_shape= "spline").update_layout(xaxis_title = "", yaxis_title = "", title= { 'text':f'{col}','xanchor':'center', 'x': 0.5}, legend = dict(
+                        title = '',
+                        yanchor = 'bottom',
+                        y = -0.5,
+                        xanchor = 'center',
+                        x = 0.5, 
+                        orientation = 'h', 
+                        ))
+                    fig.update_yaxes(tickfont_family = 'Arial Black')               
+                    with columns[j].container(height= 375, border= True):
+                        st.plotly_chart(fig, use_container_width=True)
+                        figs.append(fig)
+    return figs
+        
+
+
+  
+
 # @st.cache_data
 def display_cluster_filter(df):
     cluster_options = [''] + list(df['Cluster'].unique())
@@ -639,7 +737,7 @@ def display_cluster_filter(df):
 def display_KPIs_filter():
     # KPIs_of_interest = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps','Total CS Traffic Earlang', 'LTE PRB Utilization','Total PS Traffic GB', '4G Users',  '5G Users', '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability' , 
                         # '2G Availability', '3G Availability', '5G Availability', '2G Interference']  # Replace with actual KPI column names
-    KPIs_of_interest = ['4G Availability', '4G Users', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps', 'LTE PRB Utilization', 'LTE UL Interference (dBm)', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '5G Availability', '5G Users', '5G UL Interference (dBm)', '3G Availability', '3G RTWP', '2G Availability', '2G Interference']
+    KPIs_of_interest = ['4G Availability', '4G Users', 'LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps', 'LTE PRB Utilization', 'LTE UL Interference (dBm)', 'Total CS Traffic Earlang', 'Total PS Traffic GB', '5G Availability', '5G Users', '5G UL Interference (dBm)','NR DL User Throughput Mbps', 'NR UL User Throughput Mbps', '3G Availability', '3G RTWP', '2G Availability', '2G Interference']
     return st.sidebar.selectbox('Select KPI', KPIs_of_interest)
 @st.cache_data(ttl=3600)
 def load_and_process_data_short(selected_date, selected_time):
@@ -791,7 +889,7 @@ def main():
         numeric_cols = ['LTE DL User Throughput Mbps', 'LTE UL User Throughput Mbps', 
                         'LTE PRB Utilization', 'Total CS Traffic Earlang', 
                         'Total PS Traffic GB', '4G Users', '5G Users', 
-                        '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability']
+                        '3G RTWP', 'LTE UL Interference (dBm)', '5G UL Interference (dBm)', '4G Availability', '5G Availability', '3G Availability', '2G Availability', '2G Interference', 'NR DL User Throughput Mbps', 'NR UL User Throughput Mbps']
 
         filtered_gdf[numeric_cols] = filtered_gdf[numeric_cols].round(2)
         # -----------------------------------------Guage Charts------------------------------------------------

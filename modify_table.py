@@ -22,9 +22,9 @@ sqlite_db_path = os.path.join(ftp_data_dir, 'database.sqlite')
 print("Database path: ", sqlite_db_path)
 table_newcolumns = {
 
-    '2G': ["R373:Cell Out-of-Service Duration(s)", "2G_interference_samples"],
-    '3G': ['VS.Cell.UnavailTime.Sys(s)'],
-    '5G': ['N.Cell.Unavail.Dur.System(s)'],
+    '5G': ["N.ThpVol.DL(kbit)", "N.ThpVol.DL.LastSlot(kbit)", "N.ThpTime.DL.RmvLastSlot(microsecond)","N.ThpVol.UL(kbit)","N.ThpVol.UE.UL.SmallPkt(kbit)","N.ThpTime.UE.UL.RmvSmallPkt(microsecond)"],
+    # '3G': ['VS.Cell.UnavailTime.Sys(s)'],
+    # '5G': ['N.Cell.Unavail.Dur.System(s)'],
 }
 
 def add_columns():
@@ -73,9 +73,9 @@ def write_to_mysql():
 
 
 def main():
-    # add_columns()
-    # get_table_info()
-    rename_columns()
+    add_columns()
+    get_table_info()
+    # rename_columns()
 
 # What is the output of the code above?
 if __name__ == "__main__":

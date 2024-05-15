@@ -67,6 +67,18 @@ def determine_table_name(filename):
         return 'volte_kpi_daily'
     elif 'NB-IOT_daily_kpi' in filename:
         return 'nbiot_kpi_daily'
+    elif '2G_hrly_kpi' in filename:
+        return '2g_kpi_hourly'
+    elif 'UMTS_hrly_kpi' in filename:
+        return '3g_kpi_hourly'
+    elif '4G_hrly_kpi' in filename:
+        return '4g_kpi_hourly'
+    elif 'NR_hrly_kpi' in filename:
+        return '5g_kpi_hourly'
+    elif 'VoLTE_hrly_kpi' in filename:
+        return 'volte_kpi_hourly'
+    elif 'NB-IOT_hrly_kpi' in filename:
+        return 'nbiot_kpi_hourly' 
 
     elif 'license' in filename:
         return 'license'
