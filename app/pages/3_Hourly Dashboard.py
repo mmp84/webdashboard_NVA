@@ -13,7 +13,7 @@ from fpdf import FPDF
 from tempfile import NamedTemporaryFile
 st.set_page_config("Hourly Dashboard", layout="wide")
 
-st.sidebar.page_link("dash2.py", label ="Home")
+st.sidebar.page_link("Home.py", label ="Home")
 st.sidebar.page_link("pages/2_License Utilization.py", label = "License Utilization")
 st.sidebar.page_link("pages/1_Daily Dashboard.py", label = "Daily Dashboard")
 st.sidebar.page_link("pages/3_Hourly Dashboard.py", label = "Hourly Dashboard")
@@ -50,7 +50,7 @@ def tech_container():
             sac.ButtonsItem(label="DIY", color = 'indigo')     
         ], key = "tech", align = "start", size= "md", use_container_width=True)
     return tech
-@st.cache_data(ttl=3600*12)
+@st.cache_data(ttl=3600)
 def fetch_data(start_date, end_date , tech = "None"):
     # connect to MySQL database
     mydb =  mysql.connector.connect(

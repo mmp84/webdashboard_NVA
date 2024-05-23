@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 
 
 st.set_page_config("License Utilization", layout="wide")
-st.sidebar.page_link("dash2.py", label ="Home")
+st.sidebar.page_link("Home.py", label ="Home")
 st.sidebar.page_link("pages/2_License Utilization.py", label = "License Utilization")
 st.sidebar.page_link("pages/1_Daily Dashboard.py", label = "Daily Dashboard")
 st.sidebar.page_link("pages/3_Hourly Dashboard.py", label = "Hourly Dashboard")
